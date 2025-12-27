@@ -13,6 +13,17 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final DiaryManager _diaryManager = DiaryManager();
+  late Future<List<Diary>> _diariesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDiaries();
+  }
+
+  void _loadDiaries() {
+    _diariesFuture = _diaryManager.diaries;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,17 +32,28 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('日記本'),
         centerTitle: true,
       ),
-      body: _diaryManager.diaries.isEmpty
-          ? const Center(
+      body: FutureBuilder<List<Diary>>(
+        future: _diariesFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(
+              child: Text('載入失敗: ${snapshot.error}'),
+            );
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(
               child: Text(
                 '還沒有日記，點擊 + 按鈕新增第一篇吧！',
                 style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
-            )
-          : ListView.builder(
-              itemCount: _diaryManager.diaries.length,
+            );
+          } else {
+            final diaries = snapshot.data!;
+            return ListView.builder(
+              itemCount: diaries.length,
               itemBuilder: (context, index) {
-                final diary = _diaryManager.diaries[index];
+                final diary = diaries[index];
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: ListTile(
@@ -50,7 +72,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               },
-            ),
+            );
+          }
+        },
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addNewDiary,
         child: const Icon(Icons.add),
@@ -60,39 +85,27 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _addNewDiary() async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddDiaryScreen()),
     );
 
-    if (result != null && result is Diary) {
-      setState(() {
-        _diaryManager.addDiary(result);
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('日記儲存成功！')),
-        );
-      }
-    }
+    // 重新加載日記列表
+    setState(() {
+      _loadDiaries();
+    });
   }
 
   void _viewDiaryDetail(Diary diary) async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => DiaryDetailScreen(diary: diary)),
     );
 
-    if (result != null && result is Diary) {
-      setState(() {
-        _diaryManager.updateDiary(diary.id, result);
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('日記更新成功！')),
-        );
-      }
-    }
+    // 重新加載日記列表
+    setState(() {
+      _loadDiaries();
+    });
   }
 
   int min(int a, int b) => a < b ? a : b;

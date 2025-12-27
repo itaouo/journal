@@ -175,16 +175,16 @@ class DiaryDetailScreen extends StatelessWidget {
   }
 
   void _editDiary(BuildContext context) async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AddDiaryScreen(diary: diary),
       ),
     );
 
-    if (result != null && result is Diary && context.mounted) {
-      // 返回更新後的日記給上一頁
-      Navigator.of(context).pop(result);
+    // 編輯完成後返回上一頁，HomeScreen 會重新加載數據
+    if (context.mounted) {
+      Navigator.of(context).pop();
     }
   }
 

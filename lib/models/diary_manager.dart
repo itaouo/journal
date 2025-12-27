@@ -1,9 +1,10 @@
 import 'diary.dart';
 import 'picture.dart';
+import 'database_helper.dart';
 
 class DiaryManager {
   static final DiaryManager _instance = DiaryManager._internal();
-  final List<Diary> _diaries = [];
+  final DatabaseHelper _databaseHelper = DatabaseHelper();
 
   factory DiaryManager() {
     return _instance;
@@ -11,25 +12,29 @@ class DiaryManager {
 
   DiaryManager._internal();
 
-  List<Diary> get diaries => List.unmodifiable(_diaries);
-
-  void addDiary(Diary diary) {
-    _diaries.add(diary);
+  // 加載所有日記
+  Future<List<Diary>> get diaries async {
+    return await _databaseHelper.getAllDiaries();
   }
 
-  void updateDiary(String id, Diary updatedDiary) {
-    final index = _diaries.indexWhere((diary) => diary.id == id);
-    if (index != -1) {
-      _diaries[index] = updatedDiary;
-    }
+  // 添加日記到數據庫
+  Future<void> addDiary(Diary diary) async {
+    await _databaseHelper.insertDiary(diary);
   }
 
-  void deleteDiary(String id) {
-    _diaries.removeWhere((diary) => diary.id == id);
+  // 更新數據庫中的日記
+  Future<void> updateDiary(Diary updatedDiary) async {
+    await _databaseHelper.updateDiary(updatedDiary);
   }
 
-  Diary? getDiaryById(String id) {
-    return _diaries.where((diary) => diary.id == id).firstOrNull;
+  // 從數據庫刪除日記
+  Future<void> deleteDiary(String id) async {
+    await _databaseHelper.deleteDiary(id);
+  }
+
+  // 根據 ID 獲取日記
+  Future<Diary?> getDiaryById(String id) async {
+    return await _databaseHelper.getDiary(id);
   }
 }
 

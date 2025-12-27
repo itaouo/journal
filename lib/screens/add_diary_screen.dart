@@ -5,6 +5,7 @@ import '../models/diary.dart';
 import '../models/picture.dart';
 import '../models/diary_date.dart';
 import '../models/mood.dart';
+import '../models/database_helper.dart';
 import 'package:uuid/uuid.dart';
 
 class AddDiaryScreen extends StatefulWidget {
@@ -29,6 +30,7 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
   List<File> _selectedImageFiles = []; // 改為圖片檔案列表
 
   final ImagePicker _picker = ImagePicker();
+  final DatabaseHelper _databaseHelper = DatabaseHelper();
 
   @override
   void initState() {
@@ -439,37 +441,59 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
     );
   }
 
-  void _saveDiary() {
+  Future<void> _saveDiary() async {
     if (_formKey.currentState!.validate()) {
       final now = DateTime.now();
 
-      if (widget.diary != null) {
-        // 編輯模式：更新現有的日記
-        final updatedDiary = Diary(
-          id: widget.diary!.id,
-          createTime: widget.diary!.createTime,
-          updateTime: now,
-          date: DiaryDate.fromDateTime(_selectedDate),
-          content: _contentController.text,
-          pictures: _pictures,
-          location: _locationController.text.isEmpty ? null : _locationController.text,
-          mood: _selectedMood,
-        );
-        Navigator.of(context).pop(updatedDiary);
-      } else {
-        // 新增模式：創建新的日記
-        final uuid = const Uuid();
-        final diary = Diary(
-          id: uuid.v4(),
-          createTime: now,
-          updateTime: now,
-          date: DiaryDate.fromDateTime(_selectedDate),
-          content: _contentController.text,
-          pictures: _pictures,
-          location: _locationController.text.isEmpty ? null : _locationController.text,
-          mood: _selectedMood,
-        );
-        Navigator.of(context).pop(diary);
+      try {
+        if (widget.diary != null) {
+          // 編輯模式：更新現有的日記
+          final updatedDiary = Diary(
+            id: widget.diary!.id,
+            createTime: widget.diary!.createTime,
+            updateTime: now,
+            date: DiaryDate.fromDateTime(_selectedDate),
+            content: _contentController.text,
+            pictures: _pictures,
+            location: _locationController.text.isEmpty ? null : _locationController.text,
+            mood: _selectedMood,
+          );
+          await _databaseHelper.updateDiary(updatedDiary);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('日記更新成功！')),
+            );
+          }
+        } else {
+          // 新增模式：創建新的日記
+          final uuid = const Uuid();
+          final diary = Diary(
+            id: uuid.v4(),
+            createTime: now,
+            updateTime: now,
+            date: DiaryDate.fromDateTime(_selectedDate),
+            content: _contentController.text,
+            pictures: _pictures,
+            location: _locationController.text.isEmpty ? null : _locationController.text,
+            mood: _selectedMood,
+          );
+          await _databaseHelper.insertDiary(diary);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('日記儲存成功！')),
+            );
+          }
+        }
+        // 保存成功後返回上一頁
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('儲存失敗: $e')),
+          );
+        }
       }
     }
   }
