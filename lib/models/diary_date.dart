@@ -70,6 +70,20 @@ class DiaryDate {
     return toShortWeekdayString();
   }
 
+  /// 獲取簡短日期格式 (MM/DD)
+  /// 例如: "12/17"
+  String get shortDateString {
+    return '${dateTime.month}/${dateTime.day}';
+  }
+
+  /// 獲取簡短日期格式含星期 (MM/DD（weekday）)
+  /// 例如: "12/17（一）"
+  String get shortDateWithWeekdayString {
+    final shortWeekdays = ['（一）', '（二）', '（三）', '（四）', '（五）', '（六）', '（日）'];
+    final weekday = shortWeekdays[dateTime.weekday - 1];
+    return '${dateTime.month}/${dateTime.day}$weekday';
+  }
+
   /// 比較兩個 DiaryDate
   bool isSameDay(DiaryDate other) {
     return dateTime.year == other.dateTime.year &&

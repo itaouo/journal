@@ -7,6 +7,7 @@ import '../models/diary_date.dart';
 import '../models/mood.dart';
 import '../models/database_helper.dart';
 import 'package:uuid/uuid.dart';
+import 'content_edit_screen.dart';
 
 class AddDiaryScreen extends StatefulWidget {
   final Diary? diary;
@@ -65,15 +66,7 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.diary == null ? '新增日記' : '編輯日記'),
-        actions: [
-          TextButton(
-            onPressed: _saveDiary,
-            child: const Text(
-              '儲存',
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-          ),
-        ],
+        backgroundColor: Colors.purple.shade50,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -90,6 +83,7 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                   decoration: BoxDecoration(
+                    color: Colors.purple.shade50,
                     border: Border.all(color: Colors.grey),
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -111,19 +105,46 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
               // 內容
               const Text('內容 *', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              TextFormField(
-                controller: _contentController,
-                maxLines: 5,
-                decoration: const InputDecoration(
-                  hintText: '寫下今天的心情和發生的事...',
-                  border: OutlineInputBorder(),
+              InkWell(
+                onTap: _editContent,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.shade50,
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  constraints: const BoxConstraints(minHeight: 100),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Scrollbar(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.vertical,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxHeight: 60, // 约3行文本的高度
+                              ),
+                              child: Text(
+                                _contentController.text.isEmpty
+                                    ? '寫下今天的心情和發生的事...'
+                                    : _contentController.text,
+                                style: TextStyle(
+                                  color: _contentController.text.isEmpty
+                                      ? Colors.grey
+                                      : Colors.black,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const Icon(Icons.edit, color: Colors.grey),
+                    ],
+                  ),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '請輸入日記內容';
-                  }
-                  return null;
-                },
               ),
 
               const SizedBox(height: 24),
@@ -134,114 +155,110 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
 
               // 已選擇的圖片列表
               if (_selectedImageFiles.isNotEmpty) ...[
-                SizedBox(
-                  height: 120, // 改為 120，與圖片高度一致
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _selectedImageFiles.length + 1, // +1 為添加按鈕
-                    itemBuilder: (context, index) {
-                      if (index == _selectedImageFiles.length) {
-                        // 添加按鈕
-                        return Container(
-                          width: 120,
-                          height: 120,
-                          margin: const EdgeInsets.only(left: 8),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
-                              borderRadius: BorderRadius.circular(8),
-                              color: Colors.grey.shade50,
-                            ),
-                            child: InkWell(
-                              onTap: _showImageSourceDialog,
-                              borderRadius: BorderRadius.circular(8),
-                              child: const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.add_photo_alternate,
-                                    size: 32,
-                                    color: Colors.grey,
-                                  ),
-                                ],
-                              ),
-                            ),
-                        );
-                      } else {
-                        // 圖片項目
-                        final file = _selectedImageFiles[index];
-                        final picture = _pictures[index];
-
-                        return Container(
-                          width: 120,
-                          margin: const EdgeInsets.only(left: 8),
-                          child: Stack(
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3, // 每行最多3個
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                    childAspectRatio: 1, // 正方形比例
+                  ),
+                  itemCount: _selectedImageFiles.length + 1, // +1 為添加按鈕
+                  itemBuilder: (context, index) {
+                    if (index == _selectedImageFiles.length) {
+                      // 添加按鈕
+                      return Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey, style: BorderStyle.solid),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: InkWell(
+                          onTap: () => _pickImages(ImageSource.gallery),
+                          borderRadius: BorderRadius.circular(8),
+                          child: const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // 圖片
-                              Container(
-                                width: 120,
-                                height: 120,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                  image: DecorationImage(
-                                    image: FileImage(file),
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
+                              Icon(
+                                Icons.add_photo_alternate,
+                                size: 32,
+                                color: Colors.grey,
                               ),
-                              // 刪除按鈕
-                              Positioned(
-                                top: 4,
-                                right: 4,
-                                child: Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.black54,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: IconButton(
-                                    padding: EdgeInsets.zero,
-                                    onPressed: () => _removeImage(index),
-                                    icon: const Icon(
-                                      Icons.close,
-                                      size: 16,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // 說明文字（如果有的話）
-                              if (picture.caption != null && picture.caption!.isNotEmpty)
-                                Positioned(
-                                  bottom: 0,
-                                  left: 0,
-                                  right: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.black54,
-                                      borderRadius: BorderRadius.only(
-                                        bottomLeft: Radius.circular(8),
-                                        bottomRight: Radius.circular(8),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      picture.caption!,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ),
                             ],
                           ),
-                        );
-                      }
-                    },
-                  ),
+                        ),
+                      );
+                    } else {
+                      // 圖片項目
+                      final file = _selectedImageFiles[index];
+                      final picture = _pictures[index];
+
+                      return Container(
+                        child: Stack(
+                          children: [
+                            // 圖片
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                image: DecorationImage(
+                                  image: FileImage(file),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            // 刪除按鈕
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: Container(
+                                width: 24,
+                                height: 24,
+                                decoration: const BoxDecoration(
+                                  color: Colors.black54,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  onPressed: () => _removeImage(index),
+                                  icon: const Icon(
+                                    Icons.close,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            // 說明文字（如果有的話）
+                            if (picture.caption != null && picture.caption!.isNotEmpty)
+                              Positioned(
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.only(
+                                      bottomLeft: Radius.circular(8),
+                                      bottomRight: Radius.circular(8),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    picture.caption!,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    }
+                  },
                 ),
               ] else ...[
                 // 沒有圖片時的添加按鈕
@@ -250,29 +267,21 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
                     width: 120,
                     height: 120,
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
+                      border: Border.all(color: Colors.grey, style: BorderStyle.solid),
                       borderRadius: BorderRadius.circular(8),
                       
                     ),
                   child: InkWell(
-                    onTap: _showImageSourceDialog,
+                    onTap: () => _pickImages(ImageSource.gallery),
                     borderRadius: BorderRadius.circular(8),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           Icons.add_photo_alternate,
-                          size: 48,
-                          color: Colors.grey.shade400,
+                          size: 32,
+                          color: Colors.grey,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '點擊添加圖片',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 16,
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -343,22 +352,14 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
                 },
               ),
 
-              const SizedBox(height: 32),
-
-              // 儲存按鈕
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _saveDiary,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text('儲存日記', style: TextStyle(fontSize: 16)),
-                ),
-              ),
             ],
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _saveDiary,
+        child: const Icon(Icons.save),
+        tooltip: '儲存日記',
       ),
     );
   }
@@ -377,20 +378,21 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
     }
   }
 
-  Future<void> _pickImage(ImageSource source) async {
+  Future<void> _pickImages(ImageSource source) async {
     try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: source,
+      final List<XFile> pickedFiles = await _picker.pickMultiImage(
         maxWidth: 1200,
         maxHeight: 1200,
         imageQuality: 85,
       );
 
-      if (pickedFile != null) {
+      if (pickedFiles.isNotEmpty) {
         setState(() {
-          final file = File(pickedFile.path);
-          _selectedImageFiles.add(file);
-          _pictures.add(Picture.fromFile(pickedFile.path));
+          for (final pickedFile in pickedFiles) {
+            final file = File(pickedFile.path);
+            _selectedImageFiles.add(file);
+            _pictures.add(Picture.fromFile(pickedFile.path));
+          }
         });
       }
     } catch (e) {
@@ -409,36 +411,22 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
     });
   }
 
-  void _showImageSourceDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('選擇圖片來源'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera),
-                title: const Text('相機'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _pickImage(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('相簿'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _pickImage(ImageSource.gallery);
-                },
-              ),
-            ],
-          ),
-        );
-      },
+
+  Future<void> _editContent() async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ContentEditScreen(
+          initialContent: _contentController.text,
+        ),
+      ),
     );
+
+    if (result != null) {
+      setState(() {
+        _contentController.text = result;
+      });
+    }
   }
 
   Future<void> _saveDiary() async {
@@ -496,5 +484,20 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
         }
       }
     }
+  }
+
+  bool _isContentOverflowing(String text) {
+    if (text.isEmpty) return false;
+
+    final TextPainter textPainter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: const TextStyle(fontSize: 16),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: MediaQuery.of(context).size.width - 32 - 24); // 减去padding和icon宽度
+
+    // 检查文本高度是否超过约3行的高度 (60像素)
+    return textPainter.height > 60;
   }
 }

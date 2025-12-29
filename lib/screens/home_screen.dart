@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/diary_manager.dart';
 import '../models/diary.dart';
@@ -29,8 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('日記本'),
-        centerTitle: true,
+        title: const Text('Journal'),
+        backgroundColor: Theme.of(context).secondaryHeaderColor,
       ),
       body: FutureBuilder<List<Diary>>(
         future: _diariesFuture,
@@ -50,25 +51,64 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           } else {
             final diaries = snapshot.data!;
-            return ListView.builder(
+            return GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 1, // This ensures square items
+              ),
               itemCount: diaries.length,
               itemBuilder: (context, index) {
                 final diary = diaries[index];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: ListTile(
-                    title: Text(
-                      diary.content,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                return GestureDetector(
+                  onTap: () => _viewDiaryDetail(diary),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.purple.shade50, 
+                      borderRadius: BorderRadius.circular(8),
+                      image: diary.pictures.isNotEmpty
+                          ? DecorationImage(
+                              image: diary.pictures.first.isLocalFile
+                                  ? FileImage(File(diary.pictures.first.pictureUrl))
+                                  : NetworkImage(diary.pictures.first.pictureUrl) as ImageProvider,
+                              fit: BoxFit.cover,
+                            )
+                          : null,
                     ),
-                    subtitle: Text(
-                      '${diary.date.relativeDateString} ${diary.location ?? ""}',
-                    ),
-                    trailing: diary.mood != null
-                        ? Text(diary.mood!.emoji, style: const TextStyle(fontSize: 20))
-                        : null,
-                    onTap: () => _viewDiaryDetail(diary),
+                    child: diary.pictures.isNotEmpty
+                        ? Align(
+                            alignment: Alignment.bottomRight,
+                            child: Container(
+                              margin: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                diary.date.shortDateString,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              diary.date.shortDateString,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                   ),
                 );
               },
