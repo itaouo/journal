@@ -4,7 +4,6 @@ import 'dart:io';
 import '../models/diary.dart';
 import '../models/picture.dart';
 import '../models/diary_date.dart';
-import '../models/mood.dart';
 import '../models/database_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'content_edit_screen.dart';
@@ -21,10 +20,7 @@ class AddDiaryScreen extends StatefulWidget {
 class _AddDiaryScreenState extends State<AddDiaryScreen> {
   final _formKey = GlobalKey<FormState>();
   final _contentController = TextEditingController();
-  final _locationController = TextEditingController();
-  Mood? _selectedMood;
   final _captionController = TextEditingController();
-  final _moodReasonController = TextEditingController();
 
   DateTime _selectedDate = DateTime.now();
   List<Picture> _pictures = []; // 改為圖片列表
@@ -39,9 +35,6 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
     if (widget.diary != null) {
       _selectedDate = widget.diary!.date.dateTime;
       _contentController.text = widget.diary!.content;
-      _locationController.text = widget.diary!.location ?? '';
-      _selectedMood = widget.diary!.mood;
-      _moodReasonController.text = widget.diary!.mood?.why ?? '';
       _pictures = List.from(widget.diary!.pictures); // 複製圖片列表
       // 處理本地檔案
       for (var picture in widget.diary!.pictures) {
@@ -55,9 +48,7 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
   @override
   void dispose() {
     _contentController.dispose();
-    _locationController.dispose();
     _captionController.dispose();
-    _moodReasonController.dispose();
     super.dispose();
   }
 
@@ -291,66 +282,7 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
 
               const SizedBox(height: 24),
 
-              // 地點
-              const Text('地點', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _locationController,
-                decoration: const InputDecoration(
-                  hintText: '你在哪裡寫這篇日記？',
-                  border: OutlineInputBorder(),
-                ),
-              ),
 
-              const SizedBox(height: 24),
-
-              // 心情
-              const Text('心情', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<Mood>(
-                value: _selectedMood,
-                decoration: const InputDecoration(
-                  hintText: '選擇你的心情',
-                  border: OutlineInputBorder(),
-                ),
-                items: Mood.allMoods.map((mood) {
-                  // 如果當前選擇的心情有原因，則為下拉選項也加上相同的原因
-                  final moodWithReason = _selectedMood != null && _selectedMood!.value == mood.value
-                      ? mood.withReason(_selectedMood!.why)
-                      : mood;
-                  return DropdownMenuItem<Mood>(
-                    value: moodWithReason,
-                    child: Row(
-                      children: [
-                        Text(mood.emoji, style: const TextStyle(fontSize: 18)),
-                        const SizedBox(width: 8),
-                        Text(mood.displayName),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: (Mood? newMood) {
-                  setState(() {
-                    _selectedMood = newMood;
-                  });
-                },
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _moodReasonController,
-                decoration: const InputDecoration(
-                  hintText: '為什麼有這種心情？（可選）',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
-                onChanged: (value) {
-                  setState(() {
-                    if (_selectedMood != null) {
-                      _selectedMood = _selectedMood!.copyWith(why: value.isEmpty ? null : value);
-                    }
-                  });
-                },
-              ),
 
             ],
           ),
@@ -443,8 +375,6 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
             date: DiaryDate.fromDateTime(_selectedDate),
             content: _contentController.text,
             pictures: _pictures,
-            location: _locationController.text.isEmpty ? null : _locationController.text,
-            mood: _selectedMood,
           );
           await _databaseHelper.updateDiary(updatedDiary);
           if (mounted) {
@@ -462,8 +392,6 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
             date: DiaryDate.fromDateTime(_selectedDate),
             content: _contentController.text,
             pictures: _pictures,
-            location: _locationController.text.isEmpty ? null : _locationController.text,
-            mood: _selectedMood,
           );
           await _databaseHelper.insertDiary(diary);
           if (mounted) {

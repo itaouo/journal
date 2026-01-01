@@ -73,9 +73,6 @@ class DatabaseHelper {
       'is_deleted': diary.isDeleted ? 1 : 0,
       'date': diary.date.toDateString(),
       'content': diary.content,
-      'location': diary.location,
-      'mood_value': diary.mood?.value,
-      'mood_why': diary.mood?.why,
     });
 
     // 插入圖片
@@ -101,9 +98,6 @@ class DatabaseHelper {
         'is_deleted': diary.isDeleted ? 1 : 0,
         'date': diary.date.toDateString(),
         'content': diary.content,
-        'location': diary.location,
-        'mood_value': diary.mood?.value,
-        'mood_why': diary.mood?.why,
       },
       where: 'id = ?',
       whereArgs: [diary.id],
@@ -195,11 +189,6 @@ class DatabaseHelper {
       date: DiaryDate.fromString(map['date'] as String),
       content: map['content'] as String,
       pictures: pictures,
-      location: map['location'] as String?,
-      mood: Mood.fromString(
-        map['mood_value'] as String?,
-        map['mood_why'] as String?,
-      ),
     );
   }
 

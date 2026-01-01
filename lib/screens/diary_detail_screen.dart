@@ -144,22 +144,6 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
               ),
             ),
 
-            // 心情
-            if (widget.diary.mood != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.purple.shade50, // 與 content 相同的背景色
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  widget.diary.mood!.fullDisplay, // 只顯示表情符號
-                  style: const TextStyle(fontSize: 16, height: 1.5),
-                ),
-              ),
-            ],
 
           ],
         ),
