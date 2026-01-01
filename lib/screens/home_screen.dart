@@ -28,99 +28,101 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Journal'),
-        backgroundColor: Theme.of(context).secondaryHeaderColor,
-      ),
-      body: FutureBuilder<List<Diary>>(
-        future: _diariesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(
-              child: Text('載入失敗: ${snapshot.error}'),
-            );
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
-              child: Text(
-                '還沒有日記，點擊 + 按鈕新增第一篇吧！',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-            );
-          } else {
-            final diaries = snapshot.data!;
-            return GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-                childAspectRatio: 1, // This ensures square items
-              ),
-              itemCount: diaries.length,
-              itemBuilder: (context, index) {
-                final diary = diaries[index];
-                return GestureDetector(
-                  onTap: () => _viewDiaryDetail(diary),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.purple.shade50, 
-                      borderRadius: BorderRadius.circular(8),
-                      image: diary.pictures.isNotEmpty
-                          ? DecorationImage(
-                              image: diary.pictures.first.isLocalFile
-                                  ? FileImage(File(diary.pictures.first.pictureUrl))
-                                  : NetworkImage(diary.pictures.first.pictureUrl) as ImageProvider,
-                              fit: BoxFit.cover,
-                            )
-                          : null,
-                    ),
-                    child: diary.pictures.isNotEmpty
-                        ? Align(
-                            alignment: Alignment.bottomRight,
-                            child: Container(
-                              margin: const EdgeInsets.all(8),
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.5),
-                                borderRadius: BorderRadius.circular(4),
+    return Stack(
+      children: [
+        FutureBuilder<List<Diary>>(
+          future: _diariesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError) {
+              return Center(
+                child: Text('載入失敗: ${snapshot.error}'),
+              );
+            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(
+                child: Text(
+                  '還沒有日記，點擊 + 按鈕新增第一篇吧！',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              );
+            } else {
+              final diaries = snapshot.data!;
+              return GridView.builder(
+                padding: const EdgeInsets.all(16),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 1, // This ensures square items
+                ),
+                itemCount: diaries.length,
+                itemBuilder: (context, index) {
+                  final diary = diaries[index];
+                  return GestureDetector(
+                    onTap: () => _viewDiaryDetail(diary),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.purple.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        image: diary.pictures.isNotEmpty
+                            ? DecorationImage(
+                                image: diary.pictures.first.isLocalFile
+                                    ? FileImage(File(diary.pictures.first.pictureUrl))
+                                    : NetworkImage(diary.pictures.first.pictureUrl) as ImageProvider,
+                                fit: BoxFit.cover,
+                              )
+                            : null,
+                      ),
+                      child: diary.pictures.isNotEmpty
+                          ? Align(
+                              alignment: Alignment.bottomRight,
+                              child: Container(
+                                margin: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  diary.date.shortDateString,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
+                            )
+                          : Center(
                               child: Text(
                                 diary.date.shortDateString,
                                 style: const TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                                  color: Colors.black,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
                             ),
-                          )
-                        : Center(
-                            child: Text(
-                              diary.date.shortDateString,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                  ),
-                );
-              },
-            );
-          }
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addNewDiary,
-        child: const Icon(Icons.add),
-        tooltip: '新增日記',
-      ),
+                    ),
+                  );
+                },
+              );
+            }
+          },
+        ),
+        Positioned(
+          bottom: 16,
+          right: 16,
+          child: FloatingActionButton(
+            onPressed: _addNewDiary,
+            child: const Icon(Icons.add),
+            tooltip: '新增日記',
+          ),
+        ),
+      ],
     );
   }
 
@@ -147,6 +149,4 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadDiaries();
     });
   }
-
-  int min(int a, int b) => a < b ? a : b;
 }
