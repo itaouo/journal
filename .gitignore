@@ -12,16 +12,23 @@
 .swiftpm/
 migrate_working_dir/
 
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
 # IntelliJ related
 *.iml
 *.ipr
 *.iws
 .idea/
 
+# VS Code / Cursor
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
 #.vscode/
+.cursor/
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -29,9 +36,16 @@ migrate_working_dir/
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
 /build/
+
+# FVM (Flutter Version Management)
+.fvm/
+
+# Test coverage
+coverage/
 
 # Symbolication related
 app.*.symbols
@@ -43,3 +57,36 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android / Gradle (redundant with android/.gitignore, kept for safety)
+**/.gradle/
+**/local.properties
+**/.cxx/
+**/captures/
+
+# JVM crash dumps (e.g. from Gradle daemon)
+hs_err_pid*
+replay_pid*
+
+# Signing keys (redundant with android/.gitignore)
+*.jks
+*.keystore
+key.properties
+
+# Build outputs
+*.apk
+*.aab
+*.ipa
+*.app
+
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+
+# Firebase / Google credentials
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+lib/config/google_auth_config.dart
+firebase.json

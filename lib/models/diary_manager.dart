@@ -1,10 +1,9 @@
 import 'diary.dart';
-import 'picture.dart';
-import 'database_helper.dart';
+import '../services/diary_sync_service.dart';
 
 class DiaryManager {
   static final DiaryManager _instance = DiaryManager._internal();
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final DiarySyncService _syncService = DiarySyncService();
 
   factory DiaryManager() {
     return _instance;
@@ -12,30 +11,35 @@ class DiaryManager {
 
   DiaryManager._internal();
 
-  // 加載所有日記
   Future<List<Diary>> get diaries async {
-    return await _databaseHelper.getAllDiaries();
+    return _syncService.getDiaries();
   }
 
-  // 添加日記到數據庫
-  Future<void> addDiary(Diary diary) async {
-    await _databaseHelper.insertDiary(diary);
+  Future<void> addDiary(Diary diary, {List<String> removedDriveFileIds = const []}) async {
+    await _syncService.saveDiary(diary, removedDriveFileIds: removedDriveFileIds);
   }
 
-  // 更新數據庫中的日記
-  Future<void> updateDiary(Diary updatedDiary) async {
-    await _databaseHelper.updateDiary(updatedDiary);
+  Future<void> updateDiary(Diary updatedDiary, {List<String> removedDriveFileIds = const []}) async {
+    await _syncService.saveDiary(updatedDiary, removedDriveFileIds: removedDriveFileIds);
   }
 
-  // 從數據庫刪除日記
-  Future<void> deleteDiary(String id) async {
-    await _databaseHelper.deleteDiary(id);
+  Future<void> deleteDiary(Diary diary) async {
+    await _syncService.deleteDiary(diary);
   }
 
-  // 根據 ID 獲取日記
   Future<Diary?> getDiaryById(String id) async {
-    return await _databaseHelper.getDiary(id);
+    return _syncService.getDiaryById(id);
+  }
+
+  Future<void> syncAllPending() async {
+    await _syncService.syncAllPending();
+  }
+
+  Future<int> getPendingSyncCount() async {
+    return _syncService.getPendingSyncCount();
+  }
+
+  Future<RestoreFromCloudResult> restoreFromCloud() async {
+    return _syncService.restoreFromCloud();
   }
 }
-
-

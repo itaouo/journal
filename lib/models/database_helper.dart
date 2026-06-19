@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'diary.dart';
@@ -6,6 +8,22 @@ import 'diary_date.dart';
 import 'mood.dart';
 import 'record.dart';
 import 'meal.dart';
+
+class DiarySyncMetadata {
+  final String? driveJsonFileId;
+  final String syncStatus;
+  final List<String> pendingDriveDeletes;
+
+  const DiarySyncMetadata({
+    this.driveJsonFileId,
+    required this.syncStatus,
+    this.pendingDriveDeletes = const [],
+  });
+
+  static const statusPending = 'pending';
+  static const statusSynced = 'synced';
+  static const statusFailed = 'failed';
+}
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -29,9 +47,27 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 3,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE pictures ADD COLUMN drive_file_id TEXT');
+    }
+    if (oldVersion < 3) {
+      await db.execute(
+        "ALTER TABLE diaries ADD COLUMN drive_json_file_id TEXT",
+      );
+      await db.execute(
+        "ALTER TABLE diaries ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'",
+      );
+      await db.execute(
+        'ALTER TABLE diaries ADD COLUMN pending_drive_deletes TEXT',
+      );
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -46,7 +82,10 @@ class DatabaseHelper {
         content TEXT NOT NULL,
         location TEXT,
         mood_value TEXT,
-        mood_why TEXT
+        mood_why TEXT,
+        drive_json_file_id TEXT,
+        sync_status TEXT NOT NULL DEFAULT 'pending',
+        pending_drive_deletes TEXT
       )
     ''');
 
@@ -58,6 +97,7 @@ class DatabaseHelper {
         picture_url TEXT NOT NULL,
         caption TEXT,
         is_local_file INTEGER NOT NULL DEFAULT 0,
+        drive_file_id TEXT,
         FOREIGN KEY (diary_id) REFERENCES diaries (id) ON DELETE CASCADE
       )
     ''');
@@ -76,7 +116,12 @@ class DatabaseHelper {
 
 
   // 插入日記
-  Future<void> insertDiary(Diary diary) async {
+  Future<void> insertDiary(
+    Diary diary, {
+    String syncStatus = DiarySyncMetadata.statusPending,
+    String? driveJsonFileId,
+    List<String> pendingDriveDeletes = const [],
+  }) async {
     final db = await database;
 
     // 插入日記
@@ -87,6 +132,9 @@ class DatabaseHelper {
       'is_deleted': diary.isDeleted ? 1 : 0,
       'date': diary.date.toDateString(),
       'content': diary.content,
+      'drive_json_file_id': driveJsonFileId,
+      'sync_status': syncStatus,
+      'pending_drive_deletes': _encodePendingDeletes(pendingDriveDeletes),
     });
 
     // 插入圖片
@@ -96,13 +144,27 @@ class DatabaseHelper {
         'picture_url': picture.pictureUrl,
         'caption': picture.caption,
         'is_local_file': picture.isLocalFile ? 1 : 0,
+        'drive_file_id': picture.driveFileId,
       });
     }
   }
 
   // 更新日記
-  Future<void> updateDiary(Diary diary) async {
+  Future<void> updateDiary(
+    Diary diary, {
+    String syncStatus = DiarySyncMetadata.statusPending,
+    String? driveJsonFileId,
+    List<String>? pendingDriveDeletes,
+    bool preserveDriveJsonFileId = true,
+  }) async {
     final db = await database;
+
+    final existingMeta = await getDiarySyncMetadata(diary.id);
+    final resolvedDriveJsonFileId = driveJsonFileId ??
+        (preserveDriveJsonFileId ? existingMeta?.driveJsonFileId : null);
+    final resolvedPendingDeletes = pendingDriveDeletes ??
+        existingMeta?.pendingDriveDeletes ??
+        const <String>[];
 
     // 更新日記
     await db.update(
@@ -112,6 +174,9 @@ class DatabaseHelper {
         'is_deleted': diary.isDeleted ? 1 : 0,
         'date': diary.date.toDateString(),
         'content': diary.content,
+        'drive_json_file_id': resolvedDriveJsonFileId,
+        'sync_status': syncStatus,
+        'pending_drive_deletes': _encodePendingDeletes(resolvedPendingDeletes),
       },
       where: 'id = ?',
       whereArgs: [diary.id],
@@ -127,8 +192,114 @@ class DatabaseHelper {
         'picture_url': picture.pictureUrl,
         'caption': picture.caption,
         'is_local_file': picture.isLocalFile ? 1 : 0,
+        'drive_file_id': picture.driveFileId,
       });
     }
+  }
+
+  Future<void> upsertDiary(Diary diary) async {
+    final existing = await getDiary(diary.id);
+    if (existing == null) {
+      await insertDiary(diary);
+    } else {
+      await updateDiary(diary);
+    }
+  }
+
+  Future<void> upsertDiaryFromCloud(
+    Diary diary, {
+    required String driveJsonFileId,
+  }) async {
+    final existing = await getDiary(diary.id);
+    if (existing == null) {
+      await insertDiary(
+        diary,
+        syncStatus: DiarySyncMetadata.statusSynced,
+        driveJsonFileId: driveJsonFileId,
+      );
+    } else {
+      await updateDiary(
+        diary,
+        syncStatus: DiarySyncMetadata.statusSynced,
+        driveJsonFileId: driveJsonFileId,
+        pendingDriveDeletes: const [],
+      );
+    }
+  }
+
+  Future<DiarySyncMetadata?> getDiarySyncMetadata(String id) async {
+    final db = await database;
+    final rows = await db.query(
+      'diaries',
+      columns: ['drive_json_file_id', 'sync_status', 'pending_drive_deletes'],
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (rows.isEmpty) return null;
+    return _mapToSyncMetadata(rows.first);
+  }
+
+  Future<List<String>> getPendingSyncDiaryIds() async {
+    final db = await database;
+    final rows = await db.query(
+      'diaries',
+      columns: ['id'],
+      where: "sync_status IN (?, ?) AND is_deleted = 0",
+      whereArgs: [
+        DiarySyncMetadata.statusPending,
+        DiarySyncMetadata.statusFailed,
+      ],
+    );
+    return rows.map((row) => row['id'] as String).toList();
+  }
+
+  Future<int> getPendingSyncCount() async {
+    final ids = await getPendingSyncDiaryIds();
+    return ids.length;
+  }
+
+  Future<void> updateSyncStatus(
+    String id, {
+    required String syncStatus,
+    String? driveJsonFileId,
+    List<String> pendingDriveDeletes = const [],
+  }) async {
+    final db = await database;
+    final updates = <String, Object?>{
+      'sync_status': syncStatus,
+      'pending_drive_deletes': _encodePendingDeletes(pendingDriveDeletes),
+    };
+    if (driveJsonFileId != null) {
+      updates['drive_json_file_id'] = driveJsonFileId;
+    }
+    await db.update(
+      'diaries',
+      updates,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  String? _encodePendingDeletes(List<String> ids) {
+    if (ids.isEmpty) return null;
+    return jsonEncode(ids);
+  }
+
+  List<String> _decodePendingDeletes(String? raw) {
+    if (raw == null || raw.isEmpty) return const [];
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return const [];
+    return decoded.map((item) => item.toString()).toList();
+  }
+
+  DiarySyncMetadata _mapToSyncMetadata(Map<String, dynamic> map) {
+    return DiarySyncMetadata(
+      driveJsonFileId: map['drive_json_file_id'] as String?,
+      syncStatus: map['sync_status'] as String? ??
+          DiarySyncMetadata.statusPending,
+      pendingDriveDeletes:
+          _decodePendingDeletes(map['pending_drive_deletes'] as String?),
+    );
   }
 
   // 刪除日記
@@ -186,11 +357,18 @@ class DatabaseHelper {
       whereArgs: [diaryId],
     );
 
-    return pictureMaps.map((map) => Picture(
-      pictureUrl: map['picture_url'] as String,
-      caption: map['caption'] as String?,
-      isLocalFile: (map['is_local_file'] as int) == 1,
-    )).toList();
+    return pictureMaps.map((map) {
+      final driveFileId = map['drive_file_id'] as String?;
+      final pictureUrl = map['picture_url'] as String;
+      final isLocalFile = (map['is_local_file'] as int) == 1;
+
+      return Picture(
+        pictureUrl: pictureUrl,
+        caption: map['caption'] as String?,
+        isLocalFile: isLocalFile,
+        driveFileId: driveFileId,
+      );
+    }).toList();
   }
 
   // 將數據庫行映射為 Diary 對象

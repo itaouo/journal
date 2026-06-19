@@ -4,7 +4,7 @@ import 'dart:io';
 import '../models/diary.dart';
 import '../models/picture.dart';
 import '../models/diary_date.dart';
-import '../models/database_helper.dart';
+import '../models/diary_manager.dart';
 import 'package:uuid/uuid.dart';
 import 'content_edit_screen.dart';
 
@@ -25,9 +25,11 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
   DateTime _selectedDate = DateTime.now();
   List<Picture> _pictures = []; // 改為圖片列表
   List<File> _selectedImageFiles = []; // 改為圖片檔案列表
+  final List<String> _removedDriveFileIds = [];
+  bool _isSaving = false;
 
   final ImagePicker _picker = ImagePicker();
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final DiaryManager _diaryManager = DiaryManager();
 
   @override
   void initState() {
@@ -145,20 +147,19 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
               const SizedBox(height: 8),
 
               // 已選擇的圖片列表
-              if (_selectedImageFiles.isNotEmpty) ...[
+              if (_pictures.isNotEmpty) ...[
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3, // 每行最多3個
+                    crossAxisCount: 3,
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
-                    childAspectRatio: 1, // 正方形比例
+                    childAspectRatio: 1,
                   ),
-                  itemCount: _selectedImageFiles.length + 1, // +1 為添加按鈕
+                  itemCount: _pictures.length + 1,
                   itemBuilder: (context, index) {
-                    if (index == _selectedImageFiles.length) {
-                      // 添加按鈕
+                    if (index == _pictures.length) {
                       return Container(
                         decoration: BoxDecoration(
                           border: Border.all(color: Colors.grey, style: BorderStyle.solid),
@@ -180,19 +181,18 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
                         ),
                       );
                     } else {
-                      // 圖片項目
-                      final file = _selectedImageFiles[index];
                       final picture = _pictures[index];
 
                       return Container(
                         child: Stack(
                           children: [
-                            // 圖片
                             Container(
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
                                 image: DecorationImage(
-                                  image: FileImage(file),
+                                  image: picture.isLocalFile
+                                      ? FileImage(File(picture.pictureUrl))
+                                      : NetworkImage(picture.pictureUrl) as ImageProvider,
                                   fit: BoxFit.cover,
                                 ),
                               ),
@@ -289,8 +289,17 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _saveDiary,
-        child: const Icon(Icons.save),
+        onPressed: _isSaving ? null : _saveDiary,
+        child: _isSaving
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : const Icon(Icons.save),
         tooltip: '儲存日記',
       ),
     );
@@ -337,8 +346,14 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
   }
 
   void _removeImage(int index) {
+    final picture = _pictures[index];
+    if (picture.driveFileId != null) {
+      _removedDriveFileIds.add(picture.driveFileId!);
+    }
     setState(() {
-      _selectedImageFiles.removeAt(index);
+      if (picture.isLocalFile) {
+        _selectedImageFiles.remove(File(picture.pictureUrl));
+      }
       _pictures.removeAt(index);
     });
   }
@@ -363,11 +378,12 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
 
   Future<void> _saveDiary() async {
     if (_formKey.currentState!.validate()) {
+      if (!mounted) return;
+      setState(() => _isSaving = true);
       final now = DateTime.now();
 
       try {
         if (widget.diary != null) {
-          // 編輯模式：更新現有的日記
           final updatedDiary = Diary(
             id: widget.diary!.id,
             createTime: widget.diary!.createTime,
@@ -376,14 +392,16 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
             content: _contentController.text,
             pictures: _pictures,
           );
-          await _databaseHelper.updateDiary(updatedDiary);
+          await _diaryManager.updateDiary(
+            updatedDiary,
+            removedDriveFileIds: _removedDriveFileIds,
+          );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('日記更新成功！')),
+              const SnackBar(content: Text('日記已存至本機，背景同步中')),
             );
           }
         } else {
-          // 新增模式：創建新的日記
           final uuid = const Uuid();
           final diary = Diary(
             id: uuid.v4(),
@@ -393,14 +411,13 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
             content: _contentController.text,
             pictures: _pictures,
           );
-          await _databaseHelper.insertDiary(diary);
+          await _diaryManager.addDiary(diary);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('日記儲存成功！')),
+              const SnackBar(content: Text('日記已存至本機，背景同步中')),
             );
           }
         }
-        // 保存成功後返回上一頁
         if (mounted) {
           Navigator.of(context).pop();
         }
@@ -409,6 +426,10 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('儲存失敗: $e')),
           );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isSaving = false);
         }
       }
     }

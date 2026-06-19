@@ -9,10 +9,10 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
   final DiaryManager _diaryManager = DiaryManager();
   late Future<List<Diary>> _diariesFuture;
 
@@ -24,6 +24,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _loadDiaries() {
     _diariesFuture = _diaryManager.diaries;
+  }
+
+  void refresh() {
+    setState(() {
+      _loadDiaries();
+    });
   }
 
   @override
