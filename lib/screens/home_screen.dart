@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 import '../models/diary_manager.dart';
 import '../models/diary.dart';
 import '../widgets/expandable_fab.dart';
-import 'add_diary_screen.dart';
+import '../services/widget_launch_service.dart';
 import 'diary_detail_screen.dart';
-import 'placeholder_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -145,27 +144,24 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _addNewDiary() async {
-    await Navigator.push(
+    await WidgetLaunchService.instance.navigateToQuickAdd(
       context,
-      MaterialPageRoute(builder: (context) => const AddDiaryScreen()),
+      QuickAddAction.diary,
+      onDiaryChanged: () => setState(_loadDiaries),
     );
-
-    setState(() {
-      _loadDiaries();
-    });
   }
 
   void _addTodo() {
-    Navigator.push(
+    WidgetLaunchService.instance.navigateToQuickAdd(
       context,
-      MaterialPageRoute(builder: (context) => const PlaceholderScreen(title: 'Todo')),
+      QuickAddAction.todo,
     );
   }
 
   void _addRecipe() {
-    Navigator.push(
+    WidgetLaunchService.instance.navigateToQuickAdd(
       context,
-      MaterialPageRoute(builder: (context) => const PlaceholderScreen(title: '食譜')),
+      QuickAddAction.recipe,
     );
   }
 

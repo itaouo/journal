@@ -5,6 +5,7 @@ import 'records_screen.dart';
 import 'record_list_screen.dart';
 import '../models/diary_manager.dart';
 import '../services/auth_service.dart';
+import '../services/widget_launch_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -32,6 +33,34 @@ class _MainScreenState extends State<MainScreen> {
         onDateSelected: _onDateSelected,
       ),
     ];
+
+    WidgetLaunchService.instance.registerDiaryChangedCallback(
+      () => _homeScreenKey.currentState?.refresh(),
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handlePendingWidgetLaunch();
+    });
+  }
+
+  Future<void> _handlePendingWidgetLaunch() async {
+    final action = WidgetLaunchService.instance.consumePendingAction();
+    if (action == null || !mounted) return;
+
+    if (_selectedIndex != 0) {
+      setState(() {
+        _selectedIndex = 0;
+      });
+      await WidgetsBinding.instance.endOfFrame;
+    }
+
+    if (!mounted) return;
+
+    await WidgetLaunchService.instance.navigateToQuickAdd(
+      context,
+      action,
+      onDiaryChanged: () => _homeScreenKey.currentState?.refresh(),
+    );
   }
 
   void _onItemTapped(int index) {

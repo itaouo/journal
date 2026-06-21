@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <FrameLayout
+        android:id="@+id/widget_circle"
+        android:layout_width="@dimen/widget_circle_size"
+        android:layout_height="@dimen/widget_circle_size"
+        android:layout_gravity="center"
+        android:background="@drawable/widget_circle_background"
+        android:padding="@dimen/widget_icon_padding">
+
+        <ImageView
+            android:id="@+id/widget_icon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@string/widget_icon_desc"
+            android:scaleType="centerInside" />
+    </FrameLayout>
+</FrameLayout>

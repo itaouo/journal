@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_icon_desc">快捷新增</string>
+    <string name="widget_add_diary_desc">快速新增日記</string>
+    <string name="widget_add_recipe_desc">快速新增食譜</string>
+    <string name="widget_add_todo_desc">快速新增 Todo</string>
+    <string name="widget_add_diary_label">新增日記</string>
+    <string name="widget_add_recipe_label">新增食譜</string>
+    <string name="widget_add_todo_label">新增 Todo</string>
+</resources>

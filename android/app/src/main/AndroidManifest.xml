@@ -31,7 +31,46 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="journal" android:host="add" />
+            </intent-filter>
         </activity>
+        <receiver
+            android:name=".AddDiaryWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_add_diary_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_add_diary_info" />
+        </receiver>
+        <receiver
+            android:name=".AddRecipeWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_add_recipe_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_add_recipe_info" />
+        </receiver>
+        <receiver
+            android:name=".AddTodoWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_add_todo_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_add_todo_info" />
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
