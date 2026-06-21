@@ -23,6 +23,7 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
   final DiaryLockService _lockService = DiaryLockService();
   late bool _isLocked;
   bool _isUpdatingLock = false;
+  bool _isDeleting = false;
 
   @override
   void initState() {
@@ -271,12 +272,74 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _editDiary(context),
-        tooltip: '編輯日記',
-        child: const Icon(Icons.edit),
+      floatingActionButton: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'edit_diary',
+            onPressed: () => _editDiary(context),
+            tooltip: '編輯日記',
+            child: const Icon(Icons.edit),
+          ),
+          const SizedBox(width: 16),
+          FloatingActionButton(
+            heroTag: 'delete_diary',
+            onPressed: _isDeleting ? null : _deleteDiary,
+            tooltip: 'Delete',
+            child: _isDeleting
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.delete),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _deleteDiary() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('刪除日記'),
+        content: const Text('確定要刪除這篇日記嗎？此操作無法復原。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isDeleting = true);
+    try {
+      await _diaryManager.deleteDiary(_currentDiary);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('日記已刪除')),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('刪除失敗: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
+    }
   }
 
   void _editDiary(BuildContext context) async {

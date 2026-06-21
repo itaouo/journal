@@ -222,28 +222,32 @@ class DiarySyncService {
   }
 
   Future<void> deleteDiary(Diary diary) async {
+    final rawDiary = await _databaseHelper.getDiary(diary.id) ?? diary;
     final meta = await _databaseHelper.getDiarySyncMetadata(diary.id);
-    final payload = PendingDeletePayload(
-      driveJsonFileId: meta?.driveJsonFileId,
-      driveFileIds: diary.pictures
-          .map((picture) => picture.driveFileId)
-          .whereType<String>()
-          .toList(),
-    );
+
+    final driveFileIds = <String>{
+      for (final picture in rawDiary.pictures)
+        if (picture.driveFileId != null) picture.driveFileId!,
+      ...?meta?.pendingDriveDeletes,
+    }.toList();
+
+    var driveJsonFileId = meta?.driveJsonFileId;
+    if (await _canSyncToDrive()) {
+      driveJsonFileId ??= await _findDriveJsonFileId(diary.id);
+      await _deleteFromDrive(
+        PendingDeletePayload(
+          driveJsonFileId: driveJsonFileId,
+          driveFileIds: driveFileIds,
+        ),
+      );
+    }
 
     await _databaseHelper.deleteDiary(diary.id);
-    _scheduleBackgroundDelete(payload);
   }
 
   void _scheduleBackgroundSync(String diaryId) {
     Future<void>(() async {
       await _syncDiaryToDrive(diaryId);
-    });
-  }
-
-  void _scheduleBackgroundDelete(PendingDeletePayload payload) {
-    Future<void>(() async {
-      await _deleteFromDrive(payload);
     });
   }
 
@@ -424,10 +428,16 @@ class DiarySyncService {
 
     final jsonFileId = payload.driveJsonFileId;
     if (jsonFileId != null) {
-      try {
-        await _driveService.deleteDiaryJson(jsonFileId);
-      } catch (_) {}
+      await _driveService.deleteDiaryJson(jsonFileId);
     }
+  }
+
+  Future<String?> _findDriveJsonFileId(String diaryId) async {
+    final files = await _driveService.listAllDiaryJsonFiles();
+    for (final file in files) {
+      if (file.diaryId == diaryId) return file.fileId;
+    }
+    return null;
   }
 
   Future<Diary> _preparePlaintextCloudDiary(Diary diary, String? pin) async {
