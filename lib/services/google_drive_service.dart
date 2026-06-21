@@ -6,8 +6,8 @@ import 'package:googleapis/drive/v3.dart' as drive;
 
 import 'auth_service.dart';
 import '../models/diary.dart';
-import '../models/diary_date.dart';
 import '../models/picture.dart';
+import 'cloud_diary_codec.dart';
 
 class UploadedImage {
   final String fileId;
@@ -51,6 +51,7 @@ class GoogleDriveService {
   String? _appRootFolderId;
   String? _imagesFolderId;
   String? _contentFolderId;
+  final CloudDiaryCodec _codec = CloudDiaryCodec();
 
   Future<drive.DriveApi> _getDriveApi() async {
     final client = await _authService.googleSignIn.authenticatedClient();
@@ -161,61 +162,75 @@ class GoogleDriveService {
     );
   }
 
+  bool isEncryptedCloudDiary(Diary diary) => _codec.isEncryptedCloudDiary(diary);
+
+  Map<String, dynamic> diaryToJsonMap(
+    Diary diary, {
+    bool encryptAllBackups = false,
+  }) =>
+      _codec.diaryToJsonMap(
+        diary,
+        encryptAllBackups: encryptAllBackups,
+      );
+
+  Diary diaryFromJsonMap(Map<String, dynamic> data) =>
+      _codec.diaryFromJsonMap(data);
+
+  Future<UploadedImage> uploadEncryptedImage(
+    List<int> bytes,
+    String fileName,
+  ) async {
+    final api = await _getDriveApi();
+    final folderId = await _getOrCreateImagesFolder(api);
+
+    final driveFile = drive.File()
+      ..name = fileName
+      ..parents = [folderId]
+      ..mimeType = 'application/octet-stream';
+
+    final uploaded = await api.files.create(
+      driveFile,
+      uploadMedia: drive.Media(
+        Stream.value(bytes),
+        bytes.length,
+        contentType: 'application/octet-stream',
+      ),
+      $fields: 'id',
+    );
+
+    return UploadedImage(
+      fileId: uploaded.id!,
+      pictureUrl: '',
+    );
+  }
+
+  Future<List<int>> downloadImageBytes(String fileId) async {
+    final api = await _getDriveApi();
+    final media = await api.files.get(
+      fileId,
+      downloadOptions: drive.DownloadOptions.fullMedia,
+    ) as drive.Media;
+
+    final bytes = await media.stream.toList();
+    return bytes.expand((chunk) => chunk).toList();
+  }
+
   Future<void> deleteFile(String fileId) async {
     final api = await _getDriveApi();
     await api.files.delete(fileId);
   }
 
-  Map<String, dynamic> diaryToJsonMap(Diary diary) {
-    return {
-      'id': diary.id,
-      'createTime': diary.createTime.toUtc().toIso8601String(),
-      'updateTime': diary.updateTime.toUtc().toIso8601String(),
-      'isDeleted': diary.isDeleted,
-      'date': diary.date.toDateString(),
-      'content': diary.content,
-      'pictures': diary.pictures
-          .map((picture) => {
-                'pictureUrl': picture.pictureUrl,
-                'caption': picture.caption,
-                'driveFileId': picture.driveFileId,
-              })
-          .toList(),
-    };
-  }
-
-  Diary diaryFromJsonMap(Map<String, dynamic> data) {
-    final picturesData = data['pictures'] as List<dynamic>? ?? [];
-
-    return Diary(
-      id: data['id'] as String,
-      createTime: DateTime.parse(data['createTime'] as String).toLocal(),
-      updateTime: DateTime.parse(data['updateTime'] as String).toLocal(),
-      isDeleted: data['isDeleted'] as bool? ?? false,
-      date: DiaryDate.fromString(data['date'] as String),
-      content: data['content'] as String? ?? '',
-      pictures: picturesData
-          .map((item) {
-            final map = item as Map<String, dynamic>;
-            final driveFileId = map['driveFileId'] as String?;
-            final pictureUrl = map['pictureUrl'] as String? ??
-                (driveFileId != null
-                    ? Picture.driveThumbnailUrl(driveFileId)
-                    : '');
-            return Picture.fromUrl(
-              pictureUrl,
-              caption: map['caption'] as String?,
-              driveFileId: driveFileId,
-            );
-          })
-          .toList(),
-    );
-  }
-
-  Future<String> uploadDiaryJson(Diary diary) async {
+  Future<String> uploadDiaryJson(
+    Diary diary, {
+    bool encryptAllBackups = false,
+  }) async {
     final api = await _getDriveApi();
     final folderId = await _getOrCreateContentFolder(api);
-    final jsonBytes = utf8.encode(jsonEncode(diaryToJsonMap(diary)));
+    final jsonBytes = utf8.encode(
+      jsonEncode(
+        diaryToJsonMap(diary, encryptAllBackups: encryptAllBackups),
+      ),
+    );
 
     final driveFile = drive.File()
       ..name = '${diary.id}.json'
@@ -235,9 +250,17 @@ class GoogleDriveService {
     return uploaded.id!;
   }
 
-  Future<String> updateDiaryJson(Diary diary, String fileId) async {
+  Future<String> updateDiaryJson(
+    Diary diary,
+    String fileId, {
+    bool encryptAllBackups = false,
+  }) async {
     final api = await _getDriveApi();
-    final jsonBytes = utf8.encode(jsonEncode(diaryToJsonMap(diary)));
+    final jsonBytes = utf8.encode(
+      jsonEncode(
+        diaryToJsonMap(diary, encryptAllBackups: encryptAllBackups),
+      ),
+    );
 
     await api.files.update(
       drive.File()..name = '${diary.id}.json',

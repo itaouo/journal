@@ -5,7 +5,10 @@ import 'records_screen.dart';
 import 'record_list_screen.dart';
 import '../models/diary_manager.dart';
 import '../services/auth_service.dart';
+import '../services/diary_lock_service.dart';
 import '../services/widget_launch_service.dart';
+import '../widgets/pin_entry_dialog.dart';
+import '../widgets/pin_setup_dialog.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -19,7 +22,10 @@ class _MainScreenState extends State<MainScreen> {
   DateTime _selectedDate = DateTime.now();
   final AuthService _authService = AuthService();
   final DiaryManager _diaryManager = DiaryManager();
+  final DiaryLockService _lockService = DiaryLockService();
   final GlobalKey<HomeScreenState> _homeScreenKey = GlobalKey<HomeScreenState>();
+  bool _hasPin = false;
+  bool _encryptAllBackups = false;
 
   late final List<Widget> _screens;
 
@@ -34,6 +40,7 @@ class _MainScreenState extends State<MainScreen> {
       ),
     ];
 
+    _loadSettings();
     WidgetLaunchService.instance.registerDiaryChangedCallback(
       () => _homeScreenKey.currentState?.refresh(),
     );
@@ -61,6 +68,141 @@ class _MainScreenState extends State<MainScreen> {
       action,
       onDiaryChanged: () => _homeScreenKey.currentState?.refresh(),
     );
+  }
+
+  Future<void> _loadSettings() async {
+    final hasPin = await _lockService.hasPin();
+    final encryptAllBackups = await _diaryManager.getEncryptAllBackups();
+    if (mounted) {
+      setState(() {
+        _hasPin = hasPin;
+        _encryptAllBackups = encryptAllBackups;
+      });
+    }
+  }
+
+  Future<void> _loadHasPin() async {
+    await _loadSettings();
+  }
+
+  Future<void> _toggleEncryptAllBackups() async {
+    final enabling = !_encryptAllBackups;
+
+    if (enabling) {
+      if (!await _lockService.hasPin()) {
+        final setupPin = await showPinSetupDialog(
+          context,
+          title: '設定 PIN',
+          subtitle: '全部備份加密需要 PIN',
+        );
+        if (setupPin == null || !mounted) return;
+        await _lockService.setPin(setupPin);
+      } else if (!await _ensureSessionPin(subtitle: '啟用全部備份加密需要 PIN')) {
+        return;
+      }
+    }
+
+    await _diaryManager.setEncryptAllBackups(enabling);
+    if (!mounted) return;
+
+    setState(() {
+      _encryptAllBackups = enabling;
+      _hasPin = true;
+    });
+
+    if (enabling && _authService.isSignedIn) {
+      if (!await _ensureSessionPin(subtitle: '同步加密備份需要 PIN')) return;
+      await _syncPendingNow();
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            enabling
+                ? '已啟用全部備份加密，日記將以 PIN 加密上傳至 Google Drive'
+                : '已關閉全部備份加密，下次同步將上傳明文格式',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<bool> _ensureSessionPin({String? subtitle}) async {
+    if (_lockService.hasSessionPin) return true;
+    if (!await _lockService.hasPin()) return true;
+    if (!mounted) return false;
+
+    final pin = await showPinEntryDialog(
+      context,
+      title: '輸入 PIN',
+      subtitle: subtitle ?? '處理上鎖日記需要 PIN',
+    );
+    if (pin == null) return false;
+
+    if (!await _lockService.verifyPin(pin)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PIN 錯誤')),
+        );
+      }
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _changePin() async {
+    final oldPin = await showPinEntryDialog(
+      context,
+      title: '輸入目前 PIN',
+    );
+    if (oldPin == null || !mounted) return;
+
+    if (!await _lockService.verifyPin(oldPin)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('目前 PIN 錯誤，無法變更')),
+        );
+      }
+      return;
+    }
+
+    final newPin = await showPinSetupDialog(
+      context,
+      title: '設定新 PIN',
+    );
+    if (newPin == null || !mounted) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      await _diaryManager.reencryptAllLockedDiaries(oldPin, newPin);
+      final changed = await _lockService.changePin(oldPin, newPin);
+      if (mounted) {
+        Navigator.pop(context);
+        if (changed) {
+          await _diaryManager.syncAllPending();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('PIN 已更新，上鎖日記已重新加密')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('PIN 更新失敗')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PIN 更新失敗: $e')),
+        );
+      }
+    }
   }
 
   void _onItemTapped(int index) {
@@ -165,6 +307,10 @@ class _MainScreenState extends State<MainScreen> {
 
     if (confirmed != true || !mounted) return;
 
+    if (await _diaryManager.shouldPromptPinBeforeRestore()) {
+      if (!await _ensureSessionPin(subtitle: '還原上鎖日記需要 PIN')) return;
+    }
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -203,6 +349,10 @@ class _MainScreenState extends State<MainScreen> {
         );
       }
       return;
+    }
+
+    if (await _diaryManager.needsPinForSync()) {
+      if (!await _ensureSessionPin(subtitle: '同步上鎖日記需要 PIN')) return;
     }
 
     showDialog<void>(
@@ -244,6 +394,12 @@ class _MainScreenState extends State<MainScreen> {
       case 'sync':
         await _syncPendingNow();
         break;
+      case 'change_pin':
+        await _changePin();
+        break;
+      case 'toggle_encrypt_all':
+        await _toggleEncryptAllBackups();
+        break;
     }
   }
 
@@ -257,16 +413,30 @@ class _MainScreenState extends State<MainScreen> {
           if (_selectedIndex == 0)
             PopupMenuButton<String>(
               tooltip: '設定',
+              onOpened: _loadHasPin,
               onSelected: _handleSettingsAction,
-              itemBuilder: (context) => const [
-                PopupMenuItem(
+              itemBuilder: (context) => [
+                const PopupMenuItem(
                   value: 'restore',
                   child: Text('從 Google Drive 還原'),
                 ),
-                PopupMenuItem(
+                const PopupMenuItem(
                   value: 'sync',
                   child: Text('立即同步待上傳項目'),
                 ),
+                PopupMenuItem(
+                  value: 'toggle_encrypt_all',
+                  child: Text(
+                    _encryptAllBackups
+                        ? '全部備份加密：開'
+                        : '全部備份加密：關',
+                  ),
+                ),
+                if (_hasPin)
+                  const PopupMenuItem(
+                    value: 'change_pin',
+                    child: Text('變更 PIN'),
+                  ),
               ],
               icon: const Icon(Icons.settings),
             ),

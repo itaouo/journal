@@ -5,6 +5,9 @@ import '../models/diary.dart';
 import '../models/picture.dart';
 import '../models/diary_date.dart';
 import '../models/diary_manager.dart';
+import '../services/diary_lock_service.dart';
+import '../widgets/pin_entry_dialog.dart';
+import '../widgets/pin_setup_dialog.dart';
 import 'package:uuid/uuid.dart';
 import 'content_edit_screen.dart';
 
@@ -27,9 +30,11 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
   List<File> _selectedImageFiles = []; // 改為圖片檔案列表
   final List<String> _removedDriveFileIds = [];
   bool _isSaving = false;
+  bool _isLocked = false;
 
   final ImagePicker _picker = ImagePicker();
   final DiaryManager _diaryManager = DiaryManager();
+  final DiaryLockService _lockService = DiaryLockService();
 
   @override
   void initState() {
@@ -38,6 +43,7 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
       _selectedDate = widget.diary!.date.dateTime;
       _contentController.text = widget.diary!.content;
       _pictures = List.from(widget.diary!.pictures); // 複製圖片列表
+      _isLocked = widget.diary!.isLocked;
       // 處理本地檔案
       for (var picture in widget.diary!.pictures) {
         if (picture.isLocalFile) {
@@ -54,12 +60,67 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
     super.dispose();
   }
 
+  Future<void> _toggleLock() async {
+    if (_isLocked) {
+      final pin = await showPinEntryDialog(
+        context,
+        title: '輸入 PIN',
+        subtitle: '解除上鎖需要驗證 PIN',
+      );
+      if (pin == null) return;
+      if (!await _lockService.verifyPin(pin)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('PIN 錯誤')),
+          );
+        }
+        return;
+      }
+    } else {
+      if (!await _lockService.hasPin()) {
+        final setupPin = await showPinSetupDialog(
+          context,
+          title: '設定 PIN',
+          subtitle: '首次上鎖需設定本機 PIN',
+        );
+        if (setupPin == null) return;
+        await _lockService.setPin(setupPin);
+      } else if (!_lockService.hasSessionPin) {
+        final pin = await showPinEntryDialog(
+          context,
+          title: '輸入 PIN',
+          subtitle: '上鎖需要驗證 PIN',
+        );
+        if (pin == null) return;
+        if (!await _lockService.verifyPin(pin)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('PIN 錯誤')),
+            );
+          }
+          return;
+        }
+      }
+    }
+
+    setState(() {
+      _isLocked = !_isLocked;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.diary == null ? '新增日記' : '編輯日記'),
         backgroundColor: Colors.purple.shade50,
+        actions: [
+          IconButton(
+            onPressed: _toggleLock,
+            tooltip: _isLocked ? '解除上鎖' : '上鎖',
+            icon: Icon(_isLocked ? Icons.lock : Icons.lock_open),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -391,6 +452,7 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
             date: DiaryDate.fromDateTime(_selectedDate),
             content: _contentController.text,
             pictures: _pictures,
+            isLocked: _isLocked,
           );
           await _diaryManager.updateDiary(
             updatedDiary,
@@ -410,6 +472,7 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
             date: DiaryDate.fromDateTime(_selectedDate),
             content: _contentController.text,
             pictures: _pictures,
+            isLocked: _isLocked,
           );
           await _diaryManager.addDiary(diary);
           if (mounted) {

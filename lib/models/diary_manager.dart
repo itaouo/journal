@@ -27,6 +27,10 @@ class DiaryManager {
     await _syncService.deleteDiary(diary);
   }
 
+  Future<void> setDiaryLocked(String id, bool isLocked) async {
+    await _syncService.setDiaryLocked(id, isLocked);
+  }
+
   Future<Diary?> getDiaryById(String id) async {
     return _syncService.getDiaryById(id);
   }
@@ -41,5 +45,29 @@ class DiaryManager {
 
   Future<RestoreFromCloudResult> restoreFromCloud() async {
     return _syncService.restoreFromCloud();
+  }
+
+  Future<bool> needsPinForSync() async {
+    return _syncService.needsPinForSync();
+  }
+
+  Future<bool> shouldPromptPinBeforeRestore() async {
+    return _syncService.shouldPromptPinBeforeRestore();
+  }
+
+  Future<void> reencryptAllLockedDiaries(String oldPin, String newPin) async {
+    return _syncService.reencryptAllLockedDiaries(oldPin, newPin);
+  }
+
+  Future<void> migratePlaintextLockedDiaries() async {
+    return _syncService.migratePlaintextLockedDiaries();
+  }
+
+  Future<bool> getEncryptAllBackups() async {
+    return _syncService.getEncryptAllBackups();
+  }
+
+  Future<void> setEncryptAllBackups(bool enabled) async {
+    return _syncService.setEncryptAllBackups(enabled);
   }
 }

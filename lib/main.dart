@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/main_screen.dart';
+import 'services/diary_lock_service.dart';
 import 'services/widget_launch_service.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -27,6 +28,7 @@ Future<void> _handleIncomingUri(Uri? uri) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  DiaryLockService().resetSession();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

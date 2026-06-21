@@ -47,7 +47,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -68,6 +68,16 @@ class DatabaseHelper {
         'ALTER TABLE diaries ADD COLUMN pending_drive_deletes TEXT',
       );
     }
+    if (oldVersion < 4) {
+      await db.execute(
+        'ALTER TABLE diaries ADD COLUMN is_locked INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    if (oldVersion < 5) {
+      await db.execute(
+        'ALTER TABLE pictures ADD COLUMN is_encrypted INTEGER NOT NULL DEFAULT 0',
+      );
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -85,7 +95,8 @@ class DatabaseHelper {
         mood_why TEXT,
         drive_json_file_id TEXT,
         sync_status TEXT NOT NULL DEFAULT 'pending',
-        pending_drive_deletes TEXT
+        pending_drive_deletes TEXT,
+        is_locked INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -98,6 +109,7 @@ class DatabaseHelper {
         caption TEXT,
         is_local_file INTEGER NOT NULL DEFAULT 0,
         drive_file_id TEXT,
+        is_encrypted INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (diary_id) REFERENCES diaries (id) ON DELETE CASCADE
       )
     ''');
@@ -132,6 +144,7 @@ class DatabaseHelper {
       'is_deleted': diary.isDeleted ? 1 : 0,
       'date': diary.date.toDateString(),
       'content': diary.content,
+      'is_locked': diary.isLocked ? 1 : 0,
       'drive_json_file_id': driveJsonFileId,
       'sync_status': syncStatus,
       'pending_drive_deletes': _encodePendingDeletes(pendingDriveDeletes),
@@ -145,6 +158,7 @@ class DatabaseHelper {
         'caption': picture.caption,
         'is_local_file': picture.isLocalFile ? 1 : 0,
         'drive_file_id': picture.driveFileId,
+        'is_encrypted': picture.isEncrypted ? 1 : 0,
       });
     }
   }
@@ -174,6 +188,7 @@ class DatabaseHelper {
         'is_deleted': diary.isDeleted ? 1 : 0,
         'date': diary.date.toDateString(),
         'content': diary.content,
+        'is_locked': diary.isLocked ? 1 : 0,
         'drive_json_file_id': resolvedDriveJsonFileId,
         'sync_status': syncStatus,
         'pending_drive_deletes': _encodePendingDeletes(resolvedPendingDeletes),
@@ -193,6 +208,7 @@ class DatabaseHelper {
         'caption': picture.caption,
         'is_local_file': picture.isLocalFile ? 1 : 0,
         'drive_file_id': picture.driveFileId,
+        'is_encrypted': picture.isEncrypted ? 1 : 0,
       });
     }
   }
@@ -302,6 +318,20 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> updateDiaryLockStatus(String id, bool isLocked) async {
+    final db = await database;
+    await db.update(
+      'diaries',
+      {
+        'is_locked': isLocked ? 1 : 0,
+        'update_time': DateTime.now().millisecondsSinceEpoch,
+        'sync_status': DiarySyncMetadata.statusPending,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   // 刪除日記
   Future<void> deleteDiary(String id) async {
     final db = await database;
@@ -367,6 +397,7 @@ class DatabaseHelper {
         caption: map['caption'] as String?,
         isLocalFile: isLocalFile,
         driveFileId: driveFileId,
+        isEncrypted: (map['is_encrypted'] as int? ?? 0) == 1,
       );
     }).toList();
   }
@@ -381,6 +412,7 @@ class DatabaseHelper {
       date: DiaryDate.fromString(map['date'] as String),
       content: map['content'] as String,
       pictures: pictures,
+      isLocked: (map['is_locked'] as int? ?? 0) == 1,
     );
   }
 
@@ -529,6 +561,48 @@ class DatabaseHelper {
       'records',
       where: 'id = ?',
       whereArgs: [id],
+    );
+  }
+
+  Future<List<String>> getLockedDiaryIds() async {
+    final db = await database;
+    final rows = await db.query(
+      'diaries',
+      columns: ['id'],
+      where: 'is_locked = 1 AND is_deleted = 0',
+    );
+    return rows.map((row) => row['id'] as String).toList();
+  }
+
+  Future<bool> hasLockedDiaries() async {
+    final ids = await getLockedDiaryIds();
+    return ids.isNotEmpty;
+  }
+
+  Future<bool> hasPendingLockedSync() async {
+    final db = await database;
+    final rows = await db.query(
+      'diaries',
+      columns: ['id'],
+      where:
+          "is_locked = 1 AND is_deleted = 0 AND sync_status IN (?, ?)",
+      whereArgs: [
+        DiarySyncMetadata.statusPending,
+        DiarySyncMetadata.statusFailed,
+      ],
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<void> markAllDiariesPendingSync() async {
+    final db = await database;
+    await db.update(
+      'diaries',
+      {
+        'sync_status': DiarySyncMetadata.statusPending,
+        'update_time': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'is_deleted = 0',
     );
   }
 
