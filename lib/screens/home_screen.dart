@@ -2,8 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/diary_manager.dart';
 import '../models/diary.dart';
+import '../widgets/expandable_fab.dart';
 import 'add_diary_screen.dart';
 import 'diary_detail_screen.dart';
+import 'placeholder_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -119,14 +121,24 @@ class HomeScreenState extends State<HomeScreen> {
             }
           },
         ),
-        Positioned(
-          bottom: 16,
-          right: 16,
-          child: FloatingActionButton(
-            onPressed: _addNewDiary,
-            child: const Icon(Icons.add),
-            tooltip: '新增日記',
-          ),
+        ExpandableFab(
+          items: [
+            ExpandableFabItem(
+              icon: Icons.check_box_outlined,
+              label: 'todo',
+              onTap: _addTodo,
+            ),
+            ExpandableFabItem(
+              icon: Icons.book_outlined,
+              label: '日記',
+              onTap: _addNewDiary,
+            ),
+            ExpandableFabItem(
+              icon: Icons.restaurant_menu_outlined,
+              label: '食譜',
+              onTap: _addRecipe,
+            ),
+          ],
         ),
       ],
     );
@@ -138,10 +150,23 @@ class HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(builder: (context) => const AddDiaryScreen()),
     );
 
-    // 重新加載日記列表
     setState(() {
       _loadDiaries();
     });
+  }
+
+  void _addTodo() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const PlaceholderScreen(title: 'Todo')),
+    );
+  }
+
+  void _addRecipe() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const PlaceholderScreen(title: '食譜')),
+    );
   }
 
   void _viewDiaryDetail(Diary diary) async {
