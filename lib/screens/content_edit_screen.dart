@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 class ContentEditScreen extends StatefulWidget {
   final String initialContent;
+  final String hintText;
 
   const ContentEditScreen({
     super.key,
     required this.initialContent,
+    this.hintText = '寫下今天的心情和發生的事...',
   });
 
   @override
@@ -48,8 +50,8 @@ class _ContentEditScreenState extends State<ContentEditScreen> {
                     maxLines: null,
                     expands: true,
                     textAlignVertical: TextAlignVertical.top,
-                    decoration: const InputDecoration(
-                      hintText: '寫下今天的心情和發生的事...',
+                    decoration: InputDecoration(
+                      hintText: widget.hintText,
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.zero,
                     ),

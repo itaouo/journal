@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../screens/add_diary_screen.dart';
+import '../screens/add_review_screen.dart';
 import '../screens/placeholder_screen.dart';
 
-enum QuickAddAction { diary, recipe, todo }
+enum QuickAddAction { diary, recipe, todo, review }
 
 class WidgetLaunchService {
   WidgetLaunchService._();
@@ -12,6 +13,7 @@ class WidgetLaunchService {
   static const diaryUri = 'journal://add/diary';
   static const recipeUri = 'journal://add/recipe';
   static const todoUri = 'journal://add/todo';
+  static const reviewUri = 'journal://add/review';
 
   VoidCallback? _onDiaryChanged;
 
@@ -30,6 +32,8 @@ class WidgetLaunchService {
         return QuickAddAction.recipe;
       case 'todo':
         return QuickAddAction.todo;
+      case 'review':
+        return QuickAddAction.review;
       default:
         return null;
     }
@@ -77,6 +81,13 @@ class WidgetLaunchService {
             builder: (context) => const PlaceholderScreen(title: 'Todo'),
           ),
         );
+      case QuickAddAction.review:
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AddReviewScreen()),
+        );
+        onDiaryChanged?.call();
+        _onDiaryChanged?.call();
     }
   }
 }

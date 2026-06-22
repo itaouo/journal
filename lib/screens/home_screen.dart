@@ -4,12 +4,17 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/diary_manager.dart';
 import '../models/diary.dart';
+import '../models/review.dart';
+import '../models/review_manager.dart';
+import '../models/collection_grid_item.dart';
+import '../models/picture.dart';
 import '../widgets/expandable_fab.dart';
 import '../services/diary_lock_service.dart';
 import '../services/widget_launch_service.dart';
 import '../widgets/pin_entry_dialog.dart';
 import '../widgets/pin_setup_dialog.dart';
 import 'diary_detail_screen.dart';
+import 'review_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,36 +25,57 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   final DiaryManager _diaryManager = DiaryManager();
+  final ReviewManager _reviewManager = ReviewManager();
   final DiaryLockService _lockService = DiaryLockService();
-  late Future<List<Diary>> _diariesFuture;
+  late Future<List<CollectionGridItem>> _itemsFuture;
 
   @override
   void initState() {
     super.initState();
-    _loadDiaries();
+    _loadData();
   }
 
-  void _loadDiaries() {
-    _diariesFuture = _diaryManager.diaries;
+  void _loadData() {
+    _itemsFuture = _fetchItems();
+  }
+
+  Future<List<CollectionGridItem>> _fetchItems() async {
+    final results = await Future.wait([
+      _diaryManager.diaries,
+      _reviewManager.reviews,
+    ]);
+    return CollectionGridItem.mergeAndSort(
+      results[0] as List<Diary>,
+      results[1] as List<Review>,
+    );
   }
 
   void refresh() {
     setState(() {
-      _loadDiaries();
+      _loadData();
     });
   }
 
-  ImageProvider? _pictureImageProvider(Diary diary) {
+  ImageProvider? _pictureImageProvider(Picture picture) {
+    final display = picture.withDisplayFallback();
+    if (!display.isValid()) return null;
+    return display.isLocalFile
+        ? FileImage(File(display.pictureUrl))
+        : NetworkImage(display.pictureUrl);
+  }
+
+  ImageProvider? _diaryImageProvider(Diary diary) {
     if (diary.pictures.isEmpty) return null;
-    final picture = diary.pictures.first.withDisplayFallback();
-    if (!picture.isValid()) return null;
-    return picture.isLocalFile
-        ? FileImage(File(picture.pictureUrl))
-        : NetworkImage(picture.pictureUrl);
+    return _pictureImageProvider(diary.pictures.first);
+  }
+
+  ImageProvider? _reviewImageProvider(Review review) {
+    if (review.pictures.isEmpty) return null;
+    return _pictureImageProvider(review.pictures.first);
   }
 
   Widget _buildDiaryTile(Diary diary) {
-    final imageProvider = _pictureImageProvider(diary);
+    final imageProvider = _diaryImageProvider(diary);
     final hasImage = imageProvider != null;
 
     return GestureDetector(
@@ -60,29 +86,19 @@ class HomeScreenState extends State<HomeScreen> {
           fit: StackFit.expand,
           children: [
             if (hasImage)
-              Image(
-                image: imageProvider,
-                fit: BoxFit.cover,
-              )
+              Image(image: imageProvider, fit: BoxFit.cover)
             else
               Container(color: Colors.purple.shade50),
             if (diary.isLocked && hasImage)
               ImageFiltered(
                 imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Image(
-                  image: imageProvider,
-                  fit: BoxFit.cover,
-                ),
+                child: Image(image: imageProvider, fit: BoxFit.cover),
               ),
             if (diary.isLocked)
               Container(color: Colors.black.withOpacity(0.15)),
             if (diary.isLocked)
-              Center(
-                child: Icon(
-                  Icons.lock,
-                  size: 28,
-                  color: Colors.white,
-                ),
+              const Center(
+                child: Icon(Icons.lock, size: 28, color: Colors.white),
               ),
             if (hasImage || diary.isLocked)
               Align(
@@ -122,6 +138,89 @@ class HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildReviewBottomBadge(Review review) {
+    return Align(
+      alignment: Alignment.bottomRight,
+      child: Container(
+        margin: const EdgeInsets.all(8),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              review.reviewType.icon,
+              size: 12,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              review.experienceDate.shortDateString,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReviewTile(Review review) {
+    final imageProvider = _reviewImageProvider(review);
+    final hasImage = imageProvider != null;
+
+    return GestureDetector(
+      onTap: () => _viewReviewDetail(review),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (hasImage)
+              Image(image: imageProvider, fit: BoxFit.cover)
+            else
+              Container(color: Colors.purple.shade50),
+            if (hasImage)
+              _buildReviewBottomBadge(review)
+            else
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Text(
+                    review.title,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.purple.shade900,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            if (!hasImage) _buildReviewBottomBadge(review),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGridTile(CollectionGridItem item) {
+    switch (item.kind) {
+      case CollectionGridKind.diary:
+        return _buildDiaryTile(item.diary!);
+      case CollectionGridKind.review:
+        return _buildReviewTile(item.review!);
+    }
   }
 
   Future<bool> _ensureUnlocked(Diary diary) async {
@@ -167,8 +266,8 @@ class HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        FutureBuilder<List<Diary>>(
-          future: _diariesFuture,
+        FutureBuilder<List<CollectionGridItem>>(
+          future: _itemsFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -179,12 +278,12 @@ class HomeScreenState extends State<HomeScreen> {
             } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return const Center(
                 child: Text(
-                  '還沒有日記，點擊 + 按鈕新增第一篇吧！',
+                  '還沒有內容，點擊 + 按鈕新增吧！',
                   style: TextStyle(fontSize: 16, color: Colors.grey),
                 ),
               );
             } else {
-              final diaries = snapshot.data!;
+              final items = snapshot.data!;
               return GridView.builder(
                 padding: const EdgeInsets.all(16),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -193,9 +292,9 @@ class HomeScreenState extends State<HomeScreen> {
                   mainAxisSpacing: 8,
                   childAspectRatio: 1,
                 ),
-                itemCount: diaries.length,
+                itemCount: items.length,
                 itemBuilder: (context, index) {
-                  return _buildDiaryTile(diaries[index]);
+                  return _buildGridTile(items[index]);
                 },
               );
             }
@@ -203,6 +302,11 @@ class HomeScreenState extends State<HomeScreen> {
         ),
         ExpandableFab(
           items: [
+            ExpandableFabItem(
+              icon: Icons.rate_review_outlined,
+              label: 'Review',
+              onTap: _addReview,
+            ),
             ExpandableFabItem(
               icon: Icons.check_box_outlined,
               label: 'todo',
@@ -228,7 +332,15 @@ class HomeScreenState extends State<HomeScreen> {
     await WidgetLaunchService.instance.navigateToQuickAdd(
       context,
       QuickAddAction.diary,
-      onDiaryChanged: () => setState(_loadDiaries),
+      onDiaryChanged: () => setState(_loadData),
+    );
+  }
+
+  void _addReview() async {
+    await WidgetLaunchService.instance.navigateToQuickAdd(
+      context,
+      QuickAddAction.review,
+      onDiaryChanged: () => setState(_loadData),
     );
   }
 
@@ -265,7 +377,20 @@ class HomeScreenState extends State<HomeScreen> {
     );
 
     setState(() {
-      _loadDiaries();
+      _loadData();
+    });
+  }
+
+  void _viewReviewDetail(Review review) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReviewDetailScreen(review: review),
+      ),
+    );
+
+    setState(() {
+      _loadData();
     });
   }
 }

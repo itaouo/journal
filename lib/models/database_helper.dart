@@ -5,9 +5,10 @@ import 'package:path/path.dart';
 import 'diary.dart';
 import 'picture.dart';
 import 'diary_date.dart';
-import 'mood.dart';
 import 'record.dart';
 import 'meal.dart';
+import 'review.dart';
+import 'review_type.dart';
 
 class DiarySyncMetadata {
   final String? driveJsonFileId;
@@ -47,7 +48,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 5,
+      version: 7,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -77,6 +78,36 @@ class DatabaseHelper {
       await db.execute(
         'ALTER TABLE pictures ADD COLUMN is_encrypted INTEGER NOT NULL DEFAULT 0',
       );
+    }
+    if (oldVersion < 6) {
+      await db.execute('''
+        CREATE TABLE reviews (
+          id TEXT PRIMARY KEY,
+          create_time INTEGER NOT NULL,
+          update_time INTEGER NOT NULL,
+          is_deleted INTEGER NOT NULL DEFAULT 0,
+          review_type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          summary TEXT NOT NULL DEFAULT '',
+          key_quotes TEXT NOT NULL DEFAULT '',
+          thoughts TEXT NOT NULL DEFAULT '',
+          rating INTEGER,
+          rating_note TEXT,
+          experience_date TEXT NOT NULL
+        )
+      ''');
+    }
+    if (oldVersion < 7) {
+      await db.execute('''
+        CREATE TABLE review_pictures (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          review_id TEXT NOT NULL,
+          picture_url TEXT NOT NULL,
+          caption TEXT,
+          is_local_file INTEGER NOT NULL DEFAULT 0,
+          FOREIGN KEY (review_id) REFERENCES reviews (id) ON DELETE CASCADE
+        )
+      ''');
     }
   }
 
@@ -122,6 +153,34 @@ class DatabaseHelper {
         update_time INTEGER NOT NULL,
         occur_time INTEGER NOT NULL,
         meal_type TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE reviews (
+        id TEXT PRIMARY KEY,
+        create_time INTEGER NOT NULL,
+        update_time INTEGER NOT NULL,
+        is_deleted INTEGER NOT NULL DEFAULT 0,
+        review_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        summary TEXT NOT NULL DEFAULT '',
+        key_quotes TEXT NOT NULL DEFAULT '',
+        thoughts TEXT NOT NULL DEFAULT '',
+        rating INTEGER,
+        rating_note TEXT,
+        experience_date TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE review_pictures (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        review_id TEXT NOT NULL,
+        picture_url TEXT NOT NULL,
+        caption TEXT,
+        is_local_file INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (review_id) REFERENCES reviews (id) ON DELETE CASCADE
       )
     ''');
   }
@@ -603,6 +662,127 @@ class DatabaseHelper {
         'update_time': DateTime.now().millisecondsSinceEpoch,
       },
       where: 'is_deleted = 0',
+    );
+  }
+
+  Future<void> insertReview(Review review) async {
+    final db = await database;
+    await db.insert('reviews', _reviewToMap(review));
+    for (final picture in review.pictures) {
+      await db.insert('review_pictures', {
+        'review_id': review.id,
+        'picture_url': picture.pictureUrl,
+        'caption': picture.caption,
+        'is_local_file': picture.isLocalFile ? 1 : 0,
+      });
+    }
+  }
+
+  Future<void> updateReview(Review review) async {
+    final db = await database;
+    await db.update(
+      'reviews',
+      _reviewToMap(review),
+      where: 'id = ?',
+      whereArgs: [review.id],
+    );
+    await db.delete(
+      'review_pictures',
+      where: 'review_id = ?',
+      whereArgs: [review.id],
+    );
+    for (final picture in review.pictures) {
+      await db.insert('review_pictures', {
+        'review_id': review.id,
+        'picture_url': picture.pictureUrl,
+        'caption': picture.caption,
+        'is_local_file': picture.isLocalFile ? 1 : 0,
+      });
+    }
+  }
+
+  Future<void> deleteReview(String id) async {
+    final db = await database;
+    await db.delete('reviews', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<Review?> getReview(String id) async {
+    final db = await database;
+    final rows = await db.query(
+      'reviews',
+      where: 'id = ? AND is_deleted = 0',
+      whereArgs: [id],
+    );
+    if (rows.isEmpty) return null;
+    final reviewId = rows.first['id'] as String;
+    final pictures = await _getPicturesForReview(reviewId);
+    return _mapToReview(rows.first, pictures);
+  }
+
+  Future<List<Review>> getAllReviews() async {
+    final db = await database;
+    final rows = await db.query(
+      'reviews',
+      where: 'is_deleted = 0',
+      orderBy: 'experience_date DESC, create_time DESC',
+    );
+    final reviews = <Review>[];
+    for (final row in rows) {
+      final reviewId = row['id'] as String;
+      final pictures = await _getPicturesForReview(reviewId);
+      reviews.add(_mapToReview(row, pictures));
+    }
+    return reviews;
+  }
+
+  Future<List<Picture>> _getPicturesForReview(String reviewId) async {
+    final db = await database;
+    final pictureMaps = await db.query(
+      'review_pictures',
+      where: 'review_id = ?',
+      whereArgs: [reviewId],
+    );
+    return pictureMaps.map((map) {
+      return Picture(
+        pictureUrl: map['picture_url'] as String,
+        caption: map['caption'] as String?,
+        isLocalFile: (map['is_local_file'] as int) == 1,
+      );
+    }).toList();
+  }
+
+  Map<String, Object?> _reviewToMap(Review review) {
+    return {
+      'id': review.id,
+      'create_time': review.createTime.millisecondsSinceEpoch,
+      'update_time': review.updateTime.millisecondsSinceEpoch,
+      'is_deleted': review.isDeleted ? 1 : 0,
+      'review_type': review.reviewType.name,
+      'title': review.title,
+      'summary': review.summary,
+      'key_quotes': review.keyQuotes,
+      'thoughts': review.thoughts,
+      'rating': review.rating,
+      'rating_note': review.ratingNote,
+      'experience_date': review.experienceDate.toDateString(),
+    };
+  }
+
+  Review _mapToReview(Map<String, dynamic> map, List<Picture> pictures) {
+    return Review(
+      id: map['id'] as String,
+      createTime: DateTime.fromMillisecondsSinceEpoch(map['create_time'] as int),
+      updateTime: DateTime.fromMillisecondsSinceEpoch(map['update_time'] as int),
+      isDeleted: (map['is_deleted'] as int) == 1,
+      reviewType: ReviewType.fromString(map['review_type'] as String),
+      title: map['title'] as String,
+      summary: map['summary'] as String? ?? '',
+      keyQuotes: map['key_quotes'] as String? ?? '',
+      thoughts: map['thoughts'] as String? ?? '',
+      rating: map['rating'] as int?,
+      ratingNote: map['rating_note'] as String?,
+      experienceDate: DiaryDate.fromString(map['experience_date'] as String),
+      pictures: pictures,
     );
   }
 

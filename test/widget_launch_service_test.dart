@@ -26,6 +26,13 @@ void main() {
       );
     });
 
+    test('parses review deep link', () {
+      expect(
+        service.parseUri(Uri.parse(WidgetLaunchService.reviewUri)),
+        QuickAddAction.review,
+      );
+    });
+
     test('returns null for unrelated URI', () {
       expect(service.parseUri(Uri.parse('https://example.com')), isNull);
     });
