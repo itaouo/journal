@@ -4,7 +4,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/main_screen.dart';
 import 'services/diary_lock_service.dart';
+import 'services/theme_settings_service.dart';
 import 'services/widget_launch_service.dart';
+import 'theme/app_theme.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -42,19 +44,34 @@ Future<void> main() async {
   runApp(const MainApp());
 }
 
-class MainApp extends StatelessWidget {
+class MainApp extends StatefulWidget {
   const MainApp({super.key});
 
   @override
+  State<MainApp> createState() => _MainAppState();
+}
+
+class _MainAppState extends State<MainApp> {
+  final ThemeSettingsService _themeSettings = ThemeSettingsService();
+
+  @override
+  void initState() {
+    super.initState();
+    _themeSettings.load();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: rootNavigatorKey,
-      title: '日記本',
-      theme: ThemeData(
-        primarySwatch: Colors.purple,
-        useMaterial3: true,
-      ),
-      home: const MainScreen(),
+    return ListenableBuilder(
+      listenable: _themeSettings,
+      builder: (context, _) {
+        return MaterialApp(
+          navigatorKey: rootNavigatorKey,
+          title: '日記本',
+          theme: buildAppTheme(_themeSettings.themeColor),
+          home: const MainScreen(),
+        );
+      },
     );
   }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 class PlaceholderScreen extends StatelessWidget {
   final String title;
 
@@ -13,7 +15,7 @@ class PlaceholderScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Journal'),
-        backgroundColor: Colors.purple.shade50,
+        backgroundColor: context.journalColors.cardBackground,
       ),
       body: const Center(
         child: Text(

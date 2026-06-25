@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 import '../models/collection_grid_item.dart';
 import '../models/picture.dart';
 
@@ -33,7 +34,7 @@ class CollectionListTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
-        color: Colors.purple.shade50,
+        color: context.journalColors.cardBackground,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: onTap,

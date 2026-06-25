@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import '../models/review.dart';
 import '../models/review_manager.dart';
+import '../theme/app_theme.dart';
 import 'add_review_screen.dart';
 
 class ReviewDetailScreen extends StatefulWidget {
@@ -32,7 +33,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Journal'),
-        backgroundColor: Colors.purple.shade50,
+        backgroundColor: context.journalColors.cardBackground,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -142,7 +143,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                 Chip(
                   avatar: Icon(review.reviewType.icon, size: 18),
                   label: Text(review.reviewType.displayName),
-                  backgroundColor: Colors.purple.shade50,
+                  backgroundColor: context.journalColors.cardBackground,
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -171,7 +172,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                     Text(
                       review.ratingNote!,
                       style: TextStyle(
-                        color: Colors.purple.shade800,
+                        color: context.journalColors.sectionHeader,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -234,7 +235,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.purple.shade50,
+            color: context.journalColors.cardBackground,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(

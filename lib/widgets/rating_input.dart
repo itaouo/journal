@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 class RatingInput extends StatefulWidget {
   final int? rating;
   final String? ratingNote;
@@ -68,8 +70,22 @@ class _RatingInputState extends State<RatingInput> {
           onChanged: widget.onRatingNoteChanged,
           decoration: InputDecoration(
             hintText: '備註（選填，如：必看、普普）',
+            filled: true,
+            fillColor: context.journalColors.cardBackground,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: context.journalColors.inputBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: context.journalColors.inputBorder),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: Theme.of(context).colorScheme.primary,
+                width: 1.5,
+              ),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 12,

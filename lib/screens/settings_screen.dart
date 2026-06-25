@@ -4,6 +4,8 @@ import '../models/diary_manager.dart';
 import '../services/auth_service.dart';
 import '../services/backup_settings_service.dart';
 import '../services/diary_lock_service.dart';
+import '../services/theme_settings_service.dart';
+import '../theme/app_theme.dart';
 import '../widgets/pin_entry_dialog.dart';
 import '../widgets/pin_setup_dialog.dart';
 
@@ -21,6 +23,7 @@ class SettingsScreenState extends State<SettingsScreen> {
   final DiaryManager _diaryManager = DiaryManager();
   final DiaryLockService _lockService = DiaryLockService();
   final BackupSettingsService _backupSettings = BackupSettingsService();
+  final ThemeSettingsService _themeSettings = ThemeSettingsService();
   bool _hasPin = false;
   bool _encryptAllBackups = false;
   LockPinPromptMode _lockPinPromptMode = LockPinPromptMode.perLockedDiary;
@@ -204,6 +207,70 @@ class SettingsScreenState extends State<SettingsScreen> {
         _lockPinPromptMode = selectedMode;
       });
     }
+  }
+
+  Future<void> _showThemeColorDialog() async {
+    var selectedColor = _themeSettings.themeColor;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('主題色'),
+          content: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: AppThemeColor.values.map((color) {
+              final isSelected = selectedColor == color;
+              return InkWell(
+                onTap: () => setDialogState(() => selectedColor = color),
+                borderRadius: BorderRadius.circular(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: color.cardBackground,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected
+                              ? color.sectionHeader
+                              : color.materialColor.shade300,
+                          width: isSelected ? 3 : 1,
+                        ),
+                      ),
+                      child: isSelected
+                          ? Icon(Icons.check, color: color.sectionHeader)
+                          : null,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(color.label, style: const TextStyle(fontSize: 12)),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('確定'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    if (selectedColor == _themeSettings.themeColor) return;
+
+    await _themeSettings.setThemeColor(selectedColor);
+    if (mounted) setState(() {});
   }
 
   Future<bool> _ensureSessionPin({String? subtitle}) async {
@@ -429,12 +496,33 @@ class SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
       child: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: Colors.purple.shade800,
+          color: Colors.black,
         ),
       ),
+    );
+  }
+
+  Widget _settingsCard({required Widget child}) {
+    final dividerColor = context.journalColors.cardDivider;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: context.journalColors.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: dividerColor, width: 1),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
+    );
+  }
+
+  Widget _settingsDivider() {
+    return Container(
+      height: 1,
+      color: context.journalColors.cardDivider,
     );
   }
 
@@ -495,9 +583,7 @@ class SettingsScreenState extends State<SettingsScreen> {
             final user = snapshot.data;
             final isSignedIn = user != null;
 
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              color: Colors.purple.shade50,
+            return _settingsCard(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -554,9 +640,7 @@ class SettingsScreenState extends State<SettingsScreen> {
           },
         ),
         _sectionHeader('雲端備份'),
-        Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          color: Colors.purple.shade50,
+        _settingsCard(
           child: Column(
             children: [
               _cloudBackupActionTile(
@@ -566,7 +650,7 @@ class SettingsScreenState extends State<SettingsScreen> {
                 emptyLabel: '尚未還原',
                 onTap: _restoreFromCloud,
               ),
-              const Divider(height: 1),
+              _settingsDivider(),
               _cloudBackupActionTile(
                 icon: Icons.cloud_upload_outlined,
                 title: '立即同步待上傳項目',
@@ -578,9 +662,7 @@ class SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         _sectionHeader('安全'),
-        Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          color: Colors.purple.shade50,
+        _settingsCard(
           child: Column(
             children: [
               GestureDetector(
@@ -593,14 +675,14 @@ class SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               if (_hasPin) ...[
-                const Divider(height: 1),
+                _settingsDivider(),
                 ListTile(
                   leading: const Icon(Icons.lock_clock_outlined),
                   title: const Text('上鎖日記 PIN'),
                   subtitle: Text(lockPinPromptModeLabel(_lockPinPromptMode)),
                   onTap: _showLockPinPromptModeDialog,
                 ),
-                const Divider(height: 1),
+                _settingsDivider(),
                 ListTile(
                   leading: const Icon(Icons.pin_outlined),
                   title: const Text('變更 PIN'),
@@ -608,6 +690,23 @@ class SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ],
+          ),
+        ),
+        _sectionHeader('外觀'),
+        _settingsCard(
+          child: ListTile(
+            leading: const Icon(Icons.palette_outlined),
+            title: const Text('主題色'),
+            subtitle: Text(_themeSettings.themeColor.label),
+            trailing: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: _themeSettings.themeColor.accentDark,
+                shape: BoxShape.circle,
+              ),
+            ),
+            onTap: _showThemeColorDialog,
           ),
         ),
         const SizedBox(height: 24),

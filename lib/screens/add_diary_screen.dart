@@ -7,6 +7,7 @@ import '../models/diary_date.dart';
 import '../models/diary_manager.dart';
 import '../services/diary_lock_service.dart';
 import '../services/backup_settings_service.dart';
+import '../theme/app_theme.dart';
 import '../widgets/pin_entry_dialog.dart';
 import '../widgets/pin_setup_dialog.dart';
 import 'package:uuid/uuid.dart';
@@ -123,7 +124,7 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Journal'),
-        backgroundColor: Colors.purple.shade50,
+        backgroundColor: context.journalColors.cardBackground,
         actions: [
           IconButton(
             onPressed: _toggleLock,
@@ -147,8 +148,8 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                   decoration: BoxDecoration(
-                    color: Colors.purple.shade50,
-                    border: Border.all(color: Colors.grey),
+                    color: context.journalColors.cardBackground,
+                    border: Border.all(color: context.journalColors.inputBorder),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -174,8 +175,8 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                   decoration: BoxDecoration(
-                    color: Colors.purple.shade50,
-                    border: Border.all(color: Colors.grey),
+                    color: context.journalColors.cardBackground,
+                    border: Border.all(color: context.journalColors.inputBorder),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   constraints: const BoxConstraints(minHeight: 100),
@@ -233,7 +234,10 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
                     if (index == _pictures.length) {
                       return Container(
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey, style: BorderStyle.solid),
+                          border: Border.all(
+                            color: context.journalColors.inputBorder,
+                            style: BorderStyle.solid,
+                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: InkWell(
@@ -329,7 +333,10 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
                     width: 120,
                     height: 120,
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey, style: BorderStyle.solid),
+                      border: Border.all(
+                        color: context.journalColors.inputBorder,
+                        style: BorderStyle.solid,
+                      ),
                       borderRadius: BorderRadius.circular(8),
                       
                     ),

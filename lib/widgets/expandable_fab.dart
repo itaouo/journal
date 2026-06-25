@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 class ExpandableFabItem {
   final IconData icon;
   final String label;
@@ -121,7 +123,7 @@ class _FabMenuItem extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Material(
-              color: Colors.purple.shade50,
+              color: context.journalColors.cardBackground,
               elevation: 2,
               borderRadius: BorderRadius.circular(24),
               child: InkWell(
@@ -132,12 +134,16 @@ class _FabMenuItem extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(item.icon, color: Colors.purple.shade800, size: 22),
+                      Icon(
+                        item.icon,
+                        color: context.journalColors.sectionHeader,
+                        size: 22,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         item.label,
                         style: TextStyle(
-                          color: Colors.purple.shade800,
+                          color: context.journalColors.sectionHeader,
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
                         ),

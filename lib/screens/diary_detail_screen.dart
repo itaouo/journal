@@ -5,6 +5,7 @@ import '../models/diary.dart';
 import '../models/diary_manager.dart';
 import '../services/diary_lock_service.dart';
 import '../services/backup_settings_service.dart';
+import '../theme/app_theme.dart';
 import '../widgets/pin_entry_dialog.dart';
 import '../widgets/pin_setup_dialog.dart';
 import 'add_diary_screen.dart';
@@ -146,7 +147,7 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Journal'),
-        backgroundColor: Colors.purple.shade50,
+        backgroundColor: context.journalColors.cardBackground,
         actions: [
           IconButton(
             onPressed: _isUpdatingLock ? null : _toggleLock,
@@ -267,7 +268,7 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.purple.shade50,
+                color: context.journalColors.cardBackground,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Stack(

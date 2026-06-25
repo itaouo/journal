@@ -8,6 +8,7 @@ import '../models/review_manager.dart';
 import '../models/diary_date.dart';
 import '../models/picture.dart';
 import '../widgets/rating_input.dart';
+import '../theme/app_theme.dart';
 import 'content_edit_screen.dart';
 
 class AddReviewScreen extends StatefulWidget {
@@ -67,7 +68,7 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Journal'),
-        backgroundColor: Colors.purple.shade50,
+        backgroundColor: context.journalColors.cardBackground,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -79,7 +80,7 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
               _sectionLabel('類型'),
               DropdownButtonFormField<ReviewType>(
                 value: _reviewType,
-                decoration: _inputDecoration(),
+                decoration: _inputDecoration(context),
                 items: ReviewType.values
                     .map(
                       (type) => DropdownMenuItem(
@@ -104,7 +105,7 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
               _sectionLabel('標題 *'),
               TextFormField(
                 controller: _titleController,
-                decoration: _inputDecoration(hint: '作品名稱'),
+                decoration: _inputDecoration(context, hint: '作品名稱'),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return '請輸入標題';
@@ -118,7 +119,7 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
                 onTap: _selectDate,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                  decoration: _boxDecoration(),
+                  decoration: _boxDecoration(context),
                   child: Row(
                     children: [
                       const Icon(Icons.calendar_today),
@@ -151,7 +152,9 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
                         onTap: () => _pickImages(ImageSource.gallery),
                         child: Container(
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey),
+                            border: Border.all(
+                              color: context.journalColors.inputBorder,
+                            ),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Icon(
@@ -211,7 +214,9 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
                       onTap: () => _pickImages(ImageSource.gallery),
                       child: Container(
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey),
+                          border: Border.all(
+                            color: context.journalColors.inputBorder,
+                          ),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
@@ -295,20 +300,35 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
     );
   }
 
-  InputDecoration _inputDecoration({String? hint}) {
+  InputDecoration _inputDecoration(BuildContext context, {String? hint}) {
+    final borderColor = context.journalColors.inputBorder;
     return InputDecoration(
       hintText: hint,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       filled: true,
-      fillColor: Colors.purple.shade50,
+      fillColor: context.journalColors.cardBackground,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: borderColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: borderColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(
+          color: Theme.of(context).colorScheme.primary,
+          width: 1.5,
+        ),
+      ),
     );
   }
 
-  BoxDecoration _boxDecoration() {
+  BoxDecoration _boxDecoration(BuildContext context) {
     return BoxDecoration(
-      color: Colors.purple.shade50,
-      border: Border.all(color: Colors.grey),
+      color: context.journalColors.cardBackground,
+      border: Border.all(color: context.journalColors.inputBorder),
       borderRadius: BorderRadius.circular(8),
     );
   }
@@ -322,7 +342,7 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-        decoration: _boxDecoration(),
+        decoration: _boxDecoration(context),
         constraints: const BoxConstraints(minHeight: 80),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -13,6 +13,7 @@ import '../services/diary_lock_service.dart';
 import '../services/backup_settings_service.dart';
 import '../services/widget_launch_service.dart';
 import '../utils/diary_unlock_helper.dart';
+import '../theme/app_theme.dart';
 import 'diary_detail_screen.dart';
 import 'review_detail_screen.dart';
 
@@ -89,7 +90,7 @@ class HomeScreenState extends State<HomeScreen> {
             if (hasImage)
               Image(image: imageProvider, fit: BoxFit.cover)
             else
-              Container(color: Colors.purple.shade50),
+              Container(color: context.journalColors.cardBackground),
             if (diary.isLocked && hasImage)
               ImageFiltered(
                 imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -188,7 +189,7 @@ class HomeScreenState extends State<HomeScreen> {
             if (hasImage)
               Image(image: imageProvider, fit: BoxFit.cover)
             else
-              Container(color: Colors.purple.shade50),
+              Container(color: context.journalColors.cardBackground),
             if (hasImage)
               _buildReviewBottomBadge(review)
             else
@@ -200,7 +201,7 @@ class HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: Colors.purple.shade900,
+                      color: context.journalColors.accentDark,
                     ),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 class ContentEditScreen extends StatefulWidget {
   final String initialContent;
   final String hintText;
@@ -42,7 +44,7 @@ class _ContentEditScreenState extends State<ContentEditScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.purple.shade50,
+                    color: context.journalColors.cardBackground,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: TextField(
@@ -53,6 +55,11 @@ class _ContentEditScreenState extends State<ContentEditScreen> {
                     decoration: InputDecoration(
                       hintText: widget.hintText,
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
                       contentPadding: EdgeInsets.zero,
                     ),
                     style: const TextStyle(fontSize: 16, height: 1.5),
