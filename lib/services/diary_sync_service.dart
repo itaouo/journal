@@ -94,6 +94,13 @@ class DiarySyncService {
     await _databaseHelper.markAllDiariesPendingSync();
   }
 
+  Future<DateTime?> getLastSyncAt() => _backupSettings.getLastSyncAt();
+
+  Future<DateTime?> getLastRestoreAt() => _backupSettings.getLastRestoreAt();
+
+  Future<void> recordLastSyncAt() =>
+      _backupSettings.setLastSyncAt(DateTime.now());
+
   Future<List<Diary>> getDiaries() async {
     final rawDiaries = await _databaseHelper.getAllDiaries();
     final diaries = <Diary>[];
@@ -296,6 +303,7 @@ class DiarySyncService {
     }
 
     await migratePlaintextLockedDiaries();
+    await _backupSettings.setLastRestoreAt(DateTime.now());
     return RestoreFromCloudResult(
       restoredCount: restoredCount,
       skippedCount: skippedCount,
@@ -402,6 +410,7 @@ class DiarySyncService {
         driveJsonFileId: driveJsonFileId,
         pendingDriveDeletes: const [],
       );
+      await _backupSettings.setLastSyncAt(DateTime.now());
     } on PlaintextCloudUploadException {
       await _databaseHelper.updateSyncStatus(
         diaryId,

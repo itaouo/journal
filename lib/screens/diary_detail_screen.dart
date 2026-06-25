@@ -4,6 +4,7 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import '../models/diary.dart';
 import '../models/diary_manager.dart';
 import '../services/diary_lock_service.dart';
+import '../services/backup_settings_service.dart';
 import '../widgets/pin_entry_dialog.dart';
 import '../widgets/pin_setup_dialog.dart';
 import 'add_diary_screen.dart';
@@ -24,16 +25,29 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
   late bool _isLocked;
   bool _isUpdatingLock = false;
   bool _isDeleting = false;
+  LockPinPromptMode _pinPromptMode = LockPinPromptMode.perLockedDiary;
 
   @override
   void initState() {
     super.initState();
     _isLocked = widget.diary.isLocked;
+    _loadPinPromptMode();
+  }
+
+  Future<void> _loadPinPromptMode() async {
+    final mode = await BackupSettingsService().getLockPinPromptMode();
+    if (mounted) {
+      setState(() {
+        _pinPromptMode = mode;
+      });
+    }
   }
 
   @override
   void dispose() {
-    _lockService.resetSession();
+    if (_pinPromptMode == LockPinPromptMode.perLockedDiary) {
+      _lockService.resetSession();
+    }
     _pageController.dispose();
     super.dispose();
   }
@@ -59,7 +73,10 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
         subtitle: '解除上鎖需要驗證 PIN',
       );
       if (pin == null) return;
-      if (!await _lockService.verifyPin(pin)) {
+      if (!await _lockService.verifyPin(
+        pin,
+        pinPromptMode: _pinPromptMode,
+      )) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('PIN 錯誤')),
@@ -83,7 +100,10 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
           subtitle: '上鎖需要驗證 PIN',
         );
         if (pin == null) return;
-        if (!await _lockService.verifyPin(pin)) {
+        if (!await _lockService.verifyPin(
+        pin,
+        pinPromptMode: _pinPromptMode,
+      )) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('PIN 錯誤')),
@@ -125,9 +145,7 @@ class _DiaryDetailScreenState extends State<DiaryDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.diary.date.toShortWeekdayString(),
-        ),
+        title: const Text('Journal'),
         backgroundColor: Colors.purple.shade50,
         actions: [
           IconButton(

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:journal/services/backup_settings_service.dart';
 import 'package:journal/services/diary_lock_service.dart';
 
 void main() {
@@ -66,6 +67,45 @@ void main() {
       service.resetSession();
       expect(service.isUnlockedForSession, isFalse);
       expect(service.hasSessionPin, isFalse);
+    });
+
+    test('perLockedDiary mode caches pin without session unlock', () async {
+      final service = DiaryLockService.withStorage(MemoryPinStorage());
+      await service.setPin('1234');
+      service.resetSession();
+
+      expect(
+        await service.verifyPin(
+          '1234',
+          pinPromptMode: LockPinPromptMode.perLockedDiary,
+        ),
+        isTrue,
+      );
+      expect(service.hasSessionPin, isTrue);
+      expect(service.isUnlockedForSession, isFalse);
+      expect(
+        service.shouldSkipPinPrompt(LockPinPromptMode.perLockedDiary),
+        isFalse,
+      );
+    });
+
+    test('oncePerAppSession mode unlocks session for subsequent diaries',
+        () async {
+      final service = DiaryLockService.withStorage(MemoryPinStorage());
+      await service.setPin('1234');
+      service.resetSession();
+
+      expect(
+        await service.verifyPin(
+          '1234',
+          pinPromptMode: LockPinPromptMode.oncePerAppSession,
+        ),
+        isTrue,
+      );
+      expect(
+        service.shouldSkipPinPrompt(LockPinPromptMode.oncePerAppSession),
+        isTrue,
+      );
     });
 
     test('isValidPinFormat validates length and digits', () {

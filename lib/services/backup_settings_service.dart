@@ -1,6 +1,20 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+enum LockPinPromptMode {
+  perLockedDiary,
+  oncePerAppSession,
+}
+
+String lockPinPromptModeLabel(LockPinPromptMode mode) {
+  switch (mode) {
+    case LockPinPromptMode.perLockedDiary:
+      return '每次開啟都輸入 PIN';
+    case LockPinPromptMode.oncePerAppSession:
+      return '本次 App 解鎖一次即可';
+  }
+}
+
 abstract class BackupSettingsStorage {
   Future<String?> read(String key);
 
@@ -64,8 +78,50 @@ class BackupSettingsService {
       : _storage = storage ?? FlutterSecureBackupSettingsStorage();
 
   static const _encryptAllBackupsKey = 'encrypt_all_backups';
+  static const _lastSyncAtKey = 'last_sync_at';
+  static const _lastRestoreAtKey = 'last_restore_at';
+  static const _lockPinPromptModeKey = 'lock_pin_prompt_mode';
+  static const _perLockedDiaryValue = 'per_locked_diary';
+  static const _oncePerAppSessionValue = 'once_per_app_session';
 
   final BackupSettingsStorage _storage;
+
+  Future<DateTime?> _readDateTime(String key) async {
+    final value = await _storage.read(key);
+    if (value == null) return null;
+    return DateTime.tryParse(value);
+  }
+
+  Future<void> _writeDateTime(String key, DateTime time) async {
+    await _storage.write(key, time.toIso8601String());
+  }
+
+  Future<DateTime?> getLastSyncAt() => _readDateTime(_lastSyncAtKey);
+
+  Future<void> setLastSyncAt(DateTime time) =>
+      _writeDateTime(_lastSyncAtKey, time);
+
+  Future<DateTime?> getLastRestoreAt() => _readDateTime(_lastRestoreAtKey);
+
+  Future<void> setLastRestoreAt(DateTime time) =>
+      _writeDateTime(_lastRestoreAtKey, time);
+
+  Future<LockPinPromptMode> getLockPinPromptMode() async {
+    final value = await _storage.read(_lockPinPromptModeKey);
+    if (value == _oncePerAppSessionValue) {
+      return LockPinPromptMode.oncePerAppSession;
+    }
+    return LockPinPromptMode.perLockedDiary;
+  }
+
+  Future<void> setLockPinPromptMode(LockPinPromptMode mode) async {
+    await _storage.write(
+      _lockPinPromptModeKey,
+      mode == LockPinPromptMode.oncePerAppSession
+          ? _oncePerAppSessionValue
+          : _perLockedDiaryValue,
+    );
+  }
 
   Future<bool> getEncryptAllBackups() async {
     final value = await _storage.read(_encryptAllBackupsKey);

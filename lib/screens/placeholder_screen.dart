@@ -12,7 +12,7 @@ class PlaceholderScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: const Text('Journal'),
         backgroundColor: Colors.purple.shade50,
       ),
       body: const Center(

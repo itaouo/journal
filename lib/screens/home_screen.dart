@@ -10,9 +10,9 @@ import '../models/collection_grid_item.dart';
 import '../models/picture.dart';
 import '../widgets/expandable_fab.dart';
 import '../services/diary_lock_service.dart';
+import '../services/backup_settings_service.dart';
 import '../services/widget_launch_service.dart';
-import '../widgets/pin_entry_dialog.dart';
-import '../widgets/pin_setup_dialog.dart';
+import '../utils/diary_unlock_helper.dart';
 import 'diary_detail_screen.dart';
 import 'review_detail_screen.dart';
 
@@ -27,6 +27,7 @@ class HomeScreenState extends State<HomeScreen> {
   final DiaryManager _diaryManager = DiaryManager();
   final ReviewManager _reviewManager = ReviewManager();
   final DiaryLockService _lockService = DiaryLockService();
+  final BackupSettingsService _backupSettings = BackupSettingsService();
   late Future<List<CollectionGridItem>> _itemsFuture;
 
   @override
@@ -224,42 +225,14 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<bool> _ensureUnlocked(Diary diary) async {
-    if (!diary.isLocked || _lockService.isUnlockedForSession) {
-      return true;
-    }
-
-    if (!await _lockService.hasPin()) {
-      if (!mounted) return false;
-      final setupPin = await showPinSetupDialog(
-        context,
-        title: '設定 PIN',
-        subtitle: '此日記已上鎖，請先設定本機 PIN 才能開啟',
-      );
-      if (setupPin == null) return false;
-      await _lockService.setPin(setupPin);
-      _lockService.markSessionUnlocked();
-      return true;
-    }
-
+    final pinPromptMode = await _backupSettings.getLockPinPromptMode();
     if (!mounted) return false;
-    final pin = await showPinEntryDialog(
+    return ensureLockedDiaryUnlocked(
       context,
-      title: '輸入 PIN',
-      subtitle: '此日記已上鎖',
+      diary: diary,
+      lockService: _lockService,
+      pinPromptMode: pinPromptMode,
     );
-    if (pin == null) return false;
-
-    if (!await _lockService.verifyPin(pin)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PIN 錯誤')),
-        );
-      }
-      return false;
-    }
-
-    _lockService.markSessionUnlocked();
-    return true;
   }
 
   @override

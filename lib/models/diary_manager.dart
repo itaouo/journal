@@ -70,4 +70,10 @@ class DiaryManager {
   Future<void> setEncryptAllBackups(bool enabled) async {
     return _syncService.setEncryptAllBackups(enabled);
   }
+
+  Future<DateTime?> getLastSyncAt() => _syncService.getLastSyncAt();
+
+  Future<DateTime?> getLastRestoreAt() => _syncService.getLastRestoreAt();
+
+  Future<void> recordLastSyncAt() => _syncService.recordLastSyncAt();
 }

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'diary_encryption_service.dart';
+import 'backup_settings_service.dart';
 
 abstract class PinStorage {
   Future<String?> read(String key);
@@ -83,6 +84,10 @@ class DiaryLockService {
 
   bool get hasSessionPin => _sessionPin != null;
 
+  bool shouldSkipPinPrompt(LockPinPromptMode mode) {
+    return mode == LockPinPromptMode.oncePerAppSession && _isUnlockedForSession;
+  }
+
   void markSessionUnlocked() {
     _isUnlockedForSession = true;
   }
@@ -113,10 +118,13 @@ class DiaryLockService {
     final hash = _hashPin(pin, salt);
     await _storage.write(_pinSaltKey, salt);
     await _storage.write(_pinHashKey, hash);
-    _cacheSessionPin(pin);
+    _cacheSessionPin(pin, unlockForSession: true);
   }
 
-  Future<bool> verifyPin(String pin) async {
+  Future<bool> verifyPin(
+    String pin, {
+    LockPinPromptMode? pinPromptMode,
+  }) async {
     if (!isValidPinFormat(pin)) return false;
 
     final storedHash = await _storage.read(_pinHashKey);
@@ -125,7 +133,9 @@ class DiaryLockService {
 
     final valid = storedHash == _hashPin(pin, salt);
     if (valid) {
-      _cacheSessionPin(pin);
+      final unlockForSession = pinPromptMode == null ||
+          pinPromptMode == LockPinPromptMode.oncePerAppSession;
+      _cacheSessionPin(pin, unlockForSession: unlockForSession);
     }
     return valid;
   }
@@ -163,8 +173,10 @@ class DiaryLockService {
     return sha256.convert(bytes).toString();
   }
 
-  void _cacheSessionPin(String pin) {
+  void _cacheSessionPin(String pin, {required bool unlockForSession}) {
     _sessionPin = pin;
-    _isUnlockedForSession = true;
+    if (unlockForSession) {
+      _isUnlockedForSession = true;
+    }
   }
 }

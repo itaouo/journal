@@ -6,6 +6,7 @@ import '../models/picture.dart';
 import '../models/diary_date.dart';
 import '../models/diary_manager.dart';
 import '../services/diary_lock_service.dart';
+import '../services/backup_settings_service.dart';
 import '../widgets/pin_entry_dialog.dart';
 import '../widgets/pin_setup_dialog.dart';
 import 'package:uuid/uuid.dart';
@@ -35,6 +36,7 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
   final ImagePicker _picker = ImagePicker();
   final DiaryManager _diaryManager = DiaryManager();
   final DiaryLockService _lockService = DiaryLockService();
+  final BackupSettingsService _backupSettings = BackupSettingsService();
 
   @override
   void initState() {
@@ -61,6 +63,8 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
   }
 
   Future<void> _toggleLock() async {
+    final pinPromptMode = await _backupSettings.getLockPinPromptMode();
+
     if (_isLocked) {
       final pin = await showPinEntryDialog(
         context,
@@ -68,7 +72,10 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
         subtitle: '解除上鎖需要驗證 PIN',
       );
       if (pin == null) return;
-      if (!await _lockService.verifyPin(pin)) {
+      if (!await _lockService.verifyPin(
+        pin,
+        pinPromptMode: pinPromptMode,
+      )) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('PIN 錯誤')),
@@ -92,7 +99,10 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
           subtitle: '上鎖需要驗證 PIN',
         );
         if (pin == null) return;
-        if (!await _lockService.verifyPin(pin)) {
+        if (!await _lockService.verifyPin(
+          pin,
+          pinPromptMode: pinPromptMode,
+        )) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('PIN 錯誤')),
@@ -112,7 +122,7 @@ class _AddDiaryScreenState extends State<AddDiaryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.diary == null ? '新增日記' : '編輯日記'),
+        title: const Text('Journal'),
         backgroundColor: Colors.purple.shade50,
         actions: [
           IconButton(

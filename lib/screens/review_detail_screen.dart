@@ -31,7 +31,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(review.title),
+        title: const Text('Journal'),
         backgroundColor: Colors.purple.shade50,
       ),
       body: SingleChildScrollView(

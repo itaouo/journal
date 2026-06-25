@@ -66,7 +66,7 @@ class _AddReviewScreenState extends State<AddReviewScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.review == null ? '新增 Review' : '編輯 Review'),
+        title: const Text('Journal'),
         backgroundColor: Colors.purple.shade50,
       ),
       body: SingleChildScrollView(
