@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'home_screen.dart';
-import 'records_screen.dart';
-import 'record_list_screen.dart';
+import 'collections_list_screen.dart';
 import '../models/diary_manager.dart';
 import '../services/auth_service.dart';
 import '../services/diary_lock_service.dart';
@@ -19,31 +18,32 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  DateTime _selectedDate = DateTime.now();
   final AuthService _authService = AuthService();
   final DiaryManager _diaryManager = DiaryManager();
   final DiaryLockService _lockService = DiaryLockService();
   final GlobalKey<HomeScreenState> _homeScreenKey = GlobalKey<HomeScreenState>();
+  final GlobalKey<CollectionsListScreenState> _collectionsListKey =
+      GlobalKey<CollectionsListScreenState>();
   bool _hasPin = false;
   bool _encryptAllBackups = false;
 
   late final List<Widget> _screens;
+
+  void _refreshCollections() {
+    _homeScreenKey.currentState?.refresh();
+    _collectionsListKey.currentState?.refresh();
+  }
 
   @override
   void initState() {
     super.initState();
     _screens = [
       HomeScreen(key: _homeScreenKey),
-      RecordsScreen(
-        selectedDate: _selectedDate,
-        onDateSelected: _onDateSelected,
-      ),
+      CollectionsListScreen(key: _collectionsListKey),
     ];
 
     _loadSettings();
-    WidgetLaunchService.instance.registerDiaryChangedCallback(
-      () => _homeScreenKey.currentState?.refresh(),
-    );
+    WidgetLaunchService.instance.registerDiaryChangedCallback(_refreshCollections);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _handlePendingWidgetLaunch();
@@ -66,7 +66,7 @@ class _MainScreenState extends State<MainScreen> {
     await WidgetLaunchService.instance.navigateToQuickAdd(
       context,
       action,
-      onDiaryChanged: () => _homeScreenKey.currentState?.refresh(),
+      onDiaryChanged: _refreshCollections,
     );
   }
 
@@ -211,43 +211,6 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  void _navigateToRecordList() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const RecordListScreen()),
-    );
-  }
-
-  Future<void> _selectDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-        // 更新 RecordsScreen 的日期
-        _screens[1] = RecordsScreen(
-          selectedDate: _selectedDate,
-          onDateSelected: _onDateSelected,
-        );
-      });
-    }
-  }
-
-  void _onDateSelected(DateTime date) {
-    setState(() {
-      _selectedDate = date;
-      // 更新 RecordsScreen 的日期
-      _screens[1] = RecordsScreen(
-        selectedDate: _selectedDate,
-        onDateSelected: _onDateSelected,
-      );
-    });
-  }
-
   Future<void> _handleAuthAction() async {
     if (_authService.isSignedIn) {
       await _authService.signOut();
@@ -321,7 +284,7 @@ class _MainScreenState extends State<MainScreen> {
       final result = await _diaryManager.restoreFromCloud();
       if (mounted) {
         Navigator.pop(context);
-        _homeScreenKey.currentState?.refresh();
+        _refreshCollections();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -461,44 +424,9 @@ class _MainScreenState extends State<MainScreen> {
               );
             },
           ),
-          if (_selectedIndex == 1)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ElevatedButton(
-                onPressed: _selectDate,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.purple.shade600,
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.calendar_today, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${_selectedDate.year}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.day.toString().padLeft(2, '0')}',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.arrow_drop_down, size: 18),
-                  ],
-                ),
-              ),
-            ),
         ],
       ),
       body: _screens[_selectedIndex],
-      floatingActionButton: _selectedIndex == 1 // 只在 Records tab 顯示
-          ? FloatingActionButton(
-              onPressed: _navigateToRecordList,
-              child: const Icon(Icons.edit),
-              tooltip: '查看記錄列表',
-            )
-          : null,
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
