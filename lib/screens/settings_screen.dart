@@ -8,6 +8,7 @@ import '../services/theme_settings_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/pin_entry_dialog.dart';
 import '../widgets/pin_setup_dialog.dart';
+import 'collection_templates_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback? onCollectionsChanged;
@@ -690,6 +691,20 @@ class SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ],
+          ),
+        ),
+        _sectionHeader('模板'),
+        _settingsCard(
+          child: ListTile(
+            leading: const Icon(Icons.view_module_outlined),
+            title: const Text('新增 Collection 模板'),
+            subtitle: const Text('可新增或編輯日記 / Review 以外的模板'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const CollectionTemplatesScreen(),
+              ),
+            ),
           ),
         ),
         _sectionHeader('外觀'),

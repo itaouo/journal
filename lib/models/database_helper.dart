@@ -9,6 +9,7 @@ import 'record.dart';
 import 'meal.dart';
 import 'review.dart';
 import 'review_type.dart';
+import 'custom_entry.dart';
 
 class DiarySyncMetadata {
   final String? driveJsonFileId;
@@ -48,7 +49,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -106,6 +107,19 @@ class DatabaseHelper {
           caption TEXT,
           is_local_file INTEGER NOT NULL DEFAULT 0,
           FOREIGN KEY (review_id) REFERENCES reviews (id) ON DELETE CASCADE
+        )
+      ''');
+    }
+    if (oldVersion < 8) {
+      await db.execute('''
+        CREATE TABLE custom_entries (
+          id TEXT PRIMARY KEY,
+          template_id TEXT NOT NULL,
+          create_time INTEGER NOT NULL,
+          update_time INTEGER NOT NULL,
+          is_deleted INTEGER NOT NULL DEFAULT 0,
+          is_locked INTEGER NOT NULL DEFAULT 0,
+          fields_json TEXT NOT NULL DEFAULT '{}'
         )
       ''');
     }
@@ -181,6 +195,18 @@ class DatabaseHelper {
         caption TEXT,
         is_local_file INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (review_id) REFERENCES reviews (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE custom_entries (
+        id TEXT PRIMARY KEY,
+        template_id TEXT NOT NULL,
+        create_time INTEGER NOT NULL,
+        update_time INTEGER NOT NULL,
+        is_deleted INTEGER NOT NULL DEFAULT 0,
+        is_locked INTEGER NOT NULL DEFAULT 0,
+        fields_json TEXT NOT NULL DEFAULT '{}'
       )
     ''');
   }
@@ -784,6 +810,95 @@ class DatabaseHelper {
       experienceDate: DiaryDate.fromString(map['experience_date'] as String),
       pictures: pictures,
     );
+  }
+
+  Future<void> insertCustomEntry(CustomEntry entry) async {
+    final db = await database;
+    await db.insert('custom_entries', _customEntryToMap(entry));
+  }
+
+  Future<void> updateCustomEntry(CustomEntry entry) async {
+    final db = await database;
+    await db.update(
+      'custom_entries',
+      _customEntryToMap(entry),
+      where: 'id = ?',
+      whereArgs: [entry.id],
+    );
+  }
+
+  Future<void> softDeleteCustomEntry(String id) async {
+    final db = await database;
+    await db.update(
+      'custom_entries',
+      {
+        'is_deleted': 1,
+        'update_time': DateTime.now().millisecondsSinceEpoch,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<CustomEntry?> getCustomEntry(String id) async {
+    final db = await database;
+    final rows = await db.query(
+      'custom_entries',
+      where: 'id = ? AND is_deleted = 0',
+      whereArgs: [id],
+    );
+    if (rows.isEmpty) return null;
+    return _mapToCustomEntry(rows.first);
+  }
+
+  Future<List<CustomEntry>> getAllCustomEntries() async {
+    final db = await database;
+    final rows = await db.query(
+      'custom_entries',
+      where: 'is_deleted = 0',
+      orderBy: 'update_time DESC, create_time DESC',
+    );
+    return rows.map(_mapToCustomEntry).toList();
+  }
+
+  Map<String, Object?> _customEntryToMap(CustomEntry entry) {
+    return {
+      'id': entry.id,
+      'template_id': entry.templateId,
+      'create_time': entry.createTime.millisecondsSinceEpoch,
+      'update_time': entry.updateTime.millisecondsSinceEpoch,
+      'is_deleted': entry.isDeleted ? 1 : 0,
+      'is_locked': entry.isLocked ? 1 : 0,
+      'fields_json': entry.fieldValuesJson,
+    };
+  }
+
+  CustomEntry _mapToCustomEntry(Map<String, dynamic> map) {
+    return CustomEntry(
+      id: map['id'] as String,
+      createTime: DateTime.fromMillisecondsSinceEpoch(map['create_time'] as int),
+      updateTime: DateTime.fromMillisecondsSinceEpoch(map['update_time'] as int),
+      isDeleted: (map['is_deleted'] as int) == 1,
+      templateId: map['template_id'] as String,
+      isLocked: (map['is_locked'] as int) == 1,
+      fieldValues: _decodeFieldValues(map['fields_json'] as String?),
+    );
+  }
+
+  Map<String, dynamic> _decodeFieldValues(String? raw) {
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) {
+        return decoded.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+      }
+      return {};
+    } catch (_) {
+      return {};
+    }
   }
 
   // 關閉數據庫
