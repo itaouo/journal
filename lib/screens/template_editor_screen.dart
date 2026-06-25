@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:convert';
 
 import '../models/collection_template.dart';
+import '../models/custom_entry.dart';
+import '../models/custom_entry_manager.dart';
 import '../services/collection_template_service.dart';
 import '../theme/app_theme.dart';
 
@@ -52,6 +55,7 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
   final _uuid = const Uuid();
 
   late final CollectionTemplateService _service;
+  final CustomEntryManager _customEntryManager = CustomEntryManager();
   late bool _isReadOnly;
   bool _isLockable = false;
   bool _iconPickerExpanded = false;
@@ -435,6 +439,8 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
     setState(() => _isSaving = true);
     final now = DateTime.now();
     final existing = widget.template;
+    final shouldSyncExisting = existing != null && !existing.isBuiltIn;
+    final removedFieldIds = _getRemovedFieldIds(existing, _fields);
     final template = CollectionTemplate(
       id: existing?.id ?? _uuid.v4(),
       name: name,
@@ -449,9 +455,23 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
     try {
       await _service.save(template);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('模板已儲存')));
+      var syncedCount = 0;
+      if (shouldSyncExisting) {
+        var removeDeletedFields = false;
+        if (removedFieldIds.isNotEmpty) {
+          final confirmedDelete = await _confirmDeleteRemovedFields(removedFieldIds.length);
+          removeDeletedFields = confirmedDelete == true;
+        }
+        syncedCount = await _syncExistingCollections(
+          template,
+          removeDeletedFields: removeDeletedFields,
+        );
+      }
+      if (!mounted) return;
+      final message = syncedCount > 0
+          ? '模板已儲存，已同步 $syncedCount 筆既有內容'
+          : '模板已儲存';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
@@ -460,5 +480,64 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
       ).showSnackBar(SnackBar(content: Text('儲存失敗: $e')));
       setState(() => _isSaving = false);
     }
+  }
+
+  Set<String> _getRemovedFieldIds(
+    CollectionTemplate? existing,
+    List<TemplateField> nextFields,
+  ) {
+    if (existing == null) return const {};
+    final oldIds = existing.fields.map((field) => field.id).toSet();
+    final newIds = nextFields.map((field) => field.id).toSet();
+    return oldIds.difference(newIds);
+  }
+
+  Future<bool?> _confirmDeleteRemovedFields(int removedCount) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('欄位刪除同步'),
+        content: Text(
+          '偵測到本次模板刪除了 $removedCount 個欄位。\n\n'
+          '是否要一併刪除既有 collection 的這些欄位資料？\n'
+          '若選擇保留，只會新增新欄位，不會刪除既有資料。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('保留既有欄位'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('刪除既有欄位'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<int> _syncExistingCollections(
+    CollectionTemplate template, {
+    required bool removeDeletedFields,
+  }) async {
+    final entries = await _customEntryManager.getByTemplateId(template.id);
+    if (entries.isEmpty) return 0;
+
+    final now = DateTime.now();
+    final updatedEntries = <CustomEntry>[];
+    for (final entry in entries) {
+      final normalized = entry.normalizedByTemplate(
+        template,
+        removeDeletedFields: removeDeletedFields,
+      );
+      final oldJson = jsonEncode(entry.fieldValues);
+      final newJson = jsonEncode(normalized.fieldValues);
+      if (oldJson == newJson) continue;
+      updatedEntries.add(normalized.copyWith(updateTime: now));
+    }
+
+    if (updatedEntries.isEmpty) return 0;
+    await _customEntryManager.updateBatch(updatedEntries);
+    return updatedEntries.length;
   }
 }

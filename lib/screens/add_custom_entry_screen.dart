@@ -42,6 +42,7 @@ class _AddCustomEntryScreenState extends State<AddCustomEntryScreen> {
   final Map<String, List<String>> _imageValues = {};
   final Map<String, int?> _ratingValues = {};
   final Map<String, String?> _ratingNotes = {};
+  final Map<String, TemplateFieldType> _legacyFieldTypes = {};
 
   bool _isSaving = false;
   bool _isLocked = false;
@@ -53,6 +54,8 @@ class _AddCustomEntryScreenState extends State<AddCustomEntryScreen> {
     super.initState();
     _isLocked = widget.entry?.isLocked ?? false;
     final values = widget.entry?.fieldValues ?? const <String, dynamic>{};
+    final templateFieldIds = widget.template.fields.map((field) => field.id).toSet();
+
     for (final field in widget.template.fields) {
       switch (field.type) {
         case TemplateFieldType.text:
@@ -73,6 +76,15 @@ class _AddCustomEntryScreenState extends State<AddCustomEntryScreen> {
           _ratingValues[field.id] = values[field.id] as int?;
           _ratingNotes[field.id] = values['${field.id}__note'] as String?;
       }
+    }
+
+    for (final entry in values.entries) {
+      final key = entry.key;
+      if (key.endsWith('__note')) continue;
+      if (templateFieldIds.contains(key)) continue;
+      final inferredType = _inferLegacyFieldType(entry.value);
+      _legacyFieldTypes[key] = inferredType;
+      _hydrateFieldValueByType(key, inferredType, entry.value, values);
     }
   }
 
@@ -99,6 +111,27 @@ class _AddCustomEntryScreenState extends State<AddCustomEntryScreen> {
               _fieldLabel(field.label),
               _buildField(field),
               const SizedBox(height: 20),
+            ],
+            if (_legacyFieldTypes.isNotEmpty) ...[
+              const Divider(),
+              const SizedBox(height: 12),
+              const Text(
+                '已保留欄位（模板已移除）',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              for (final key in _legacyFieldTypes.keys) ...[
+                _fieldLabel('保留欄位：$key'),
+                _buildField(
+                  TemplateField(
+                    id: key,
+                    type: _legacyFieldTypes[key]!,
+                    label: key,
+                    hint: '',
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
             ],
           ],
         ),
@@ -430,6 +463,25 @@ class _AddCustomEntryScreenState extends State<AddCustomEntryScreen> {
       }
     }
 
+    for (final key in _legacyFieldTypes.keys) {
+      final type = _legacyFieldTypes[key]!;
+      switch (type) {
+        case TemplateFieldType.text:
+        case TemplateFieldType.largeText:
+          fieldValues[key] = (_textValues[key] ?? '').trim();
+        case TemplateFieldType.date:
+          fieldValues[key] = (_dateValues[key] ?? now).toIso8601String();
+        case TemplateFieldType.image:
+          fieldValues[key] = List<String>.from(_imageValues[key] ?? []);
+        case TemplateFieldType.rating:
+          fieldValues[key] = _ratingValues[key];
+          final note = _ratingNotes[key];
+          if (note != null && note.trim().isNotEmpty) {
+            fieldValues['${key}__note'] = note.trim();
+          }
+      }
+    }
+
     final existing = widget.entry;
     final entry = CustomEntry(
       id: existing?.id ?? _uuid.v4(),
@@ -507,5 +559,39 @@ class _AddCustomEntryScreenState extends State<AddCustomEntryScreen> {
     final hour = value.hour.toString().padLeft(2, '0');
     final minute = value.minute.toString().padLeft(2, '0');
     return '${_formatDate(value)} $hour:$minute';
+  }
+
+  TemplateFieldType _inferLegacyFieldType(dynamic value) {
+    if (value is int) return TemplateFieldType.rating;
+    if (value is List) return TemplateFieldType.image;
+    if (value is String) {
+      if (DateTime.tryParse(value) != null) return TemplateFieldType.date;
+      return TemplateFieldType.largeText;
+    }
+    return TemplateFieldType.largeText;
+  }
+
+  void _hydrateFieldValueByType(
+    String key,
+    TemplateFieldType type,
+    dynamic value,
+    Map<String, dynamic> allValues,
+  ) {
+    switch (type) {
+      case TemplateFieldType.text:
+      case TemplateFieldType.largeText:
+        _textValues[key] = (value as String?) ?? '';
+      case TemplateFieldType.date:
+        _dateValues[key] = DateTime.tryParse((value as String?) ?? '') ?? DateTime.now();
+      case TemplateFieldType.image:
+        if (value is List) {
+          _imageValues[key] = value.map((e) => e.toString()).toList();
+        } else {
+          _imageValues[key] = [];
+        }
+      case TemplateFieldType.rating:
+        _ratingValues[key] = value as int?;
+        _ratingNotes[key] = allValues['${key}__note'] as String?;
+    }
   }
 }

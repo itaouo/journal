@@ -19,12 +19,22 @@ class CustomEntryManager {
     return _db.getCustomEntry(id);
   }
 
+  Future<List<CustomEntry>> getByTemplateId(String templateId) async {
+    return _db.getCustomEntriesByTemplateId(templateId);
+  }
+
   Future<void> add(CustomEntry entry) async {
     await _db.insertCustomEntry(entry);
   }
 
   Future<void> update(CustomEntry entry) async {
     await _db.updateCustomEntry(entry);
+  }
+
+  Future<void> updateBatch(List<CustomEntry> entries) async {
+    for (final entry in entries) {
+      await _db.updateCustomEntry(entry);
+    }
   }
 
   Future<void> delete(String id) async {

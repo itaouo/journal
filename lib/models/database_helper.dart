@@ -861,6 +861,17 @@ class DatabaseHelper {
     return rows.map(_mapToCustomEntry).toList();
   }
 
+  Future<List<CustomEntry>> getCustomEntriesByTemplateId(String templateId) async {
+    final db = await database;
+    final rows = await db.query(
+      'custom_entries',
+      where: 'template_id = ? AND is_deleted = 0',
+      whereArgs: [templateId],
+      orderBy: 'update_time DESC, create_time DESC',
+    );
+    return rows.map(_mapToCustomEntry).toList();
+  }
+
   Map<String, Object?> _customEntryToMap(CustomEntry entry) {
     return {
       'id': entry.id,
