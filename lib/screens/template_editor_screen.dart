@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import 'dart:convert';
 
 import '../models/collection_template.dart';
+import '../utils/template_icons.dart';
 import '../models/custom_entry.dart';
 import '../models/custom_entry_manager.dart';
 import '../services/collection_template_service.dart';
@@ -23,33 +24,6 @@ class TemplateEditorScreen extends StatefulWidget {
 }
 
 class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
-  static const _iconOptions = <IconData>[
-    Icons.note_outlined,
-    Icons.book_outlined,
-    Icons.rate_review_outlined,
-    Icons.movie_outlined,
-    Icons.menu_book_outlined,
-    Icons.library_music_outlined,
-    Icons.restaurant_menu_outlined,
-    Icons.fitness_center_outlined,
-    Icons.travel_explore_outlined,
-    Icons.home_outlined,
-    Icons.work_outline,
-    Icons.school_outlined,
-    Icons.pets_outlined,
-    Icons.favorite_border,
-    Icons.celebration_outlined,
-    Icons.camera_alt_outlined,
-    Icons.palette_outlined,
-    Icons.lightbulb_outline,
-    Icons.check_box_outlined,
-    Icons.list_alt_outlined,
-    Icons.event_note_outlined,
-    Icons.self_improvement_outlined,
-    Icons.sports_esports_outlined,
-    Icons.star_outline,
-  ];
-
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _uuid = const Uuid();
@@ -288,8 +262,7 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
   }
 
   Widget _buildIconPicker(BuildContext context) {
-    final selectedIcon =
-        IconData(_selectedIconCodePoint, fontFamily: 'MaterialIcons');
+    final selectedIcon = templateIconFromCodePoint(_selectedIconCodePoint);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -342,7 +315,7 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: _iconOptions.length,
+            itemCount: templateIconOptions.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 6,
               mainAxisSpacing: 8,
@@ -350,7 +323,7 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
               childAspectRatio: 1,
             ),
             itemBuilder: (context, index) {
-              final icon = _iconOptions[index];
+              final icon = templateIconOptions[index];
               final isSelected = icon.codePoint == _selectedIconCodePoint;
               return InkWell(
                 onTap: () => setState(() {

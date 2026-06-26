@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../utils/template_icons.dart';
+
 enum TemplateFieldType { largeText, text, image, rating, date }
 
 enum DateFieldMode { dateOnly, dateTime }
@@ -166,5 +168,5 @@ class CollectionTemplate {
     );
   }
 
-  IconData get icon => IconData(iconCodePoint, fontFamily: 'MaterialIcons');
+  IconData get icon => templateIconFromCodePoint(iconCodePoint);
 }
