@@ -8,6 +8,7 @@ import '../models/custom_entry.dart';
 import '../models/custom_entry_manager.dart';
 import '../services/collection_template_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/unsaved_changes_dialog.dart';
 
 class TemplateEditorScreen extends StatefulWidget {
   const TemplateEditorScreen({
@@ -36,6 +37,7 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
   bool _isSaving = false;
   int _selectedIconCodePoint = CollectionTemplate.defaultIconCodePoint;
   List<TemplateField> _fields = [];
+  late final String _initialSnapshot;
 
   @override
   void initState() {
@@ -47,7 +49,11 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
     _selectedIconCodePoint =
         widget.template?.iconCodePoint ?? CollectionTemplate.defaultIconCodePoint;
     _fields = List<TemplateField>.from(widget.template?.fields ?? []);
+    _initialSnapshot = _encodeSnapshot();
   }
+
+  bool get _hasUnsavedChanges =>
+      !_isReadOnly && _encodeSnapshot() != _initialSnapshot;
 
   @override
   void dispose() {
@@ -57,7 +63,13 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleUnsavedChangesPop();
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Text(_isReadOnly ? '查看模板' : '模板編輯'),
       ),
@@ -139,7 +151,31 @@ class _TemplateEditorScreenState extends State<TemplateEditorScreen> {
                     )
                   : const Icon(Icons.save),
             ),
+      ),
     );
+  }
+
+  Future<void> _handleUnsavedChangesPop() async {
+    final action = await showUnsavedChangesDialog(context);
+    if (!mounted) return;
+    switch (action) {
+      case UnsavedChangesAction.discard:
+        Navigator.of(context).pop();
+      case UnsavedChangesAction.save:
+        await _save();
+      case UnsavedChangesAction.cancel:
+      case null:
+        break;
+    }
+  }
+
+  String _encodeSnapshot() {
+    return jsonEncode({
+      'name': _nameController.text.trim(),
+      'isLockable': _isLockable,
+      'iconCodePoint': _selectedIconCodePoint,
+      'fields': _fields.map((field) => field.toJson()).toList(),
+    });
   }
 
   Widget _sectionTitle(String title) {

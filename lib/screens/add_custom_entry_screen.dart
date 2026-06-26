@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ import '../theme/app_theme.dart';
 import '../widgets/pin_entry_dialog.dart';
 import '../widgets/pin_setup_dialog.dart';
 import '../widgets/rating_input.dart';
+import '../widgets/unsaved_changes_dialog.dart';
 import 'content_edit_screen.dart';
 
 class AddCustomEntryScreen extends StatefulWidget {
@@ -46,8 +48,10 @@ class _AddCustomEntryScreenState extends State<AddCustomEntryScreen> {
 
   bool _isSaving = false;
   bool _isLocked = false;
+  late final String _initialSnapshot;
 
   bool get _isEditing => widget.entry != null;
+  bool get _hasUnsavedChanges => _encodeSnapshot() != _initialSnapshot;
 
   @override
   void initState() {
@@ -86,11 +90,18 @@ class _AddCustomEntryScreenState extends State<AddCustomEntryScreen> {
       _legacyFieldTypes[key] = inferredType;
       _hydrateFieldValueByType(key, inferredType, entry.value, values);
     }
+    _initialSnapshot = _encodeSnapshot();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleUnsavedChangesPop();
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Text(widget.template.name),
         actions: [
@@ -146,7 +157,74 @@ class _AddCustomEntryScreenState extends State<AddCustomEntryScreen> {
               )
             : const Icon(Icons.save),
       ),
+      ),
     );
+  }
+
+  Future<void> _handleUnsavedChangesPop() async {
+    final action = await showUnsavedChangesDialog(context);
+    if (!mounted) return;
+    switch (action) {
+      case UnsavedChangesAction.discard:
+        Navigator.of(context).pop();
+      case UnsavedChangesAction.save:
+        await _save();
+      case UnsavedChangesAction.cancel:
+      case null:
+        break;
+    }
+  }
+
+  String _encodeSnapshot() {
+    return jsonEncode(_snapshotData());
+  }
+
+  Map<String, dynamic> _snapshotData() {
+    final now = DateTime.now();
+    final fieldValues = <String, dynamic>{};
+
+    for (final field in widget.template.fields) {
+      switch (field.type) {
+        case TemplateFieldType.text:
+        case TemplateFieldType.largeText:
+          fieldValues[field.id] = (_textValues[field.id] ?? '').trim();
+        case TemplateFieldType.date:
+          fieldValues[field.id] =
+              (_dateValues[field.id] ?? now).toIso8601String();
+        case TemplateFieldType.image:
+          fieldValues[field.id] = List<String>.from(_imageValues[field.id] ?? []);
+        case TemplateFieldType.rating:
+          fieldValues[field.id] = _ratingValues[field.id];
+          final note = _ratingNotes[field.id];
+          if (note != null && note.trim().isNotEmpty) {
+            fieldValues['${field.id}__note'] = note.trim();
+          }
+      }
+    }
+
+    for (final key in _legacyFieldTypes.keys) {
+      final type = _legacyFieldTypes[key]!;
+      switch (type) {
+        case TemplateFieldType.text:
+        case TemplateFieldType.largeText:
+          fieldValues[key] = (_textValues[key] ?? '').trim();
+        case TemplateFieldType.date:
+          fieldValues[key] = (_dateValues[key] ?? now).toIso8601String();
+        case TemplateFieldType.image:
+          fieldValues[key] = List<String>.from(_imageValues[key] ?? []);
+        case TemplateFieldType.rating:
+          fieldValues[key] = _ratingValues[key];
+          final note = _ratingNotes[key];
+          if (note != null && note.trim().isNotEmpty) {
+            fieldValues['${key}__note'] = note.trim();
+          }
+      }
+    }
+
+    return {
+      'fieldValues': fieldValues,
+      'isLocked': _isLocked,
+    };
   }
 
   Widget _fieldLabel(String label) {
@@ -171,7 +249,7 @@ class _AddCustomEntryScreenState extends State<AddCustomEntryScreen> {
                   return null;
                 }
               : null,
-          onChanged: (value) => _textValues[field.id] = value,
+          onChanged: (value) => setState(() => _textValues[field.id] = value),
         );
       case TemplateFieldType.largeText:
         final text = _textValues[field.id] ?? '';
@@ -238,7 +316,9 @@ class _AddCustomEntryScreenState extends State<AddCustomEntryScreen> {
           ratingNote: _ratingNotes[field.id],
           onRatingChanged: (value) => setState(() => _ratingValues[field.id] = value),
           onRatingNoteChanged: (value) {
-            _ratingNotes[field.id] = value.isEmpty ? null : value;
+            setState(() {
+              _ratingNotes[field.id] = value.isEmpty ? null : value;
+            });
           },
         );
     }

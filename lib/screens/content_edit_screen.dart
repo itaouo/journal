@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/unsaved_changes_dialog.dart';
 
 class ContentEditScreen extends StatefulWidget {
   final String initialContent;
@@ -19,10 +20,14 @@ class ContentEditScreen extends StatefulWidget {
 class _ContentEditScreenState extends State<ContentEditScreen> {
   late TextEditingController _contentController;
 
+  bool get _hasUnsavedChanges =>
+      _contentController.text != widget.initialContent;
+
   @override
   void initState() {
     super.initState();
     _contentController = TextEditingController(text: widget.initialContent);
+    _contentController.addListener(() => setState(() {}));
   }
 
   @override
@@ -31,9 +36,29 @@ class _ContentEditScreenState extends State<ContentEditScreen> {
     super.dispose();
   }
 
+  Future<void> _handleUnsavedChangesPop() async {
+    final action = await showUnsavedChangesDialog(context);
+    if (!mounted) return;
+    switch (action) {
+      case UnsavedChangesAction.discard:
+        Navigator.of(context).pop();
+      case UnsavedChangesAction.save:
+        Navigator.of(context).pop(_contentController.text);
+      case UnsavedChangesAction.cancel:
+      case null:
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleUnsavedChangesPop();
+      },
+      child: Scaffold(
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -104,6 +129,7 @@ class _ContentEditScreenState extends State<ContentEditScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
